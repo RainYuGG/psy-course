@@ -20,9 +20,9 @@
 
 ## Task 1: Project Foundation, 12-Field Course Model, and Rule-Based Extractor
 
-- [ ] 1.1 建立 Python 套件與目錄結構（`scraper/__init__.py`、`docs/data/`、`tests/`、`requirements.txt`、`pyproject.toml`）
-- [ ] 1.2 實作 `scraper/models.py` 定義 12 個指定欄位的 `CourseRecord` dataclass、欄位順序常數 `COURSE_FIELD_NAMES` 與 `to_dict()` / `to_csv_row()` 方法
-- [ ] 1.3 實作 `scraper/extractor.py` 純規則抽取引擎與 `tests/test_extractor.py` 單元測試
+- [x] 1.1 建立 Python 套件與目錄結構（`scraper/__init__.py`、`docs/data/`、`tests/`、`requirements.txt`、`pyproject.toml`）
+- [x] 1.2 實作 `scraper/models.py` 定義 12 個指定欄位的 `CourseRecord` dataclass、欄位順序常數 `COURSE_FIELD_NAMES` 與 `to_dict()` / `to_csv_row()` 方法
+- [x] 1.3 實作 `scraper/extractor.py` 純規則抽取引擎與 `tests/test_extractor.py` 單元測試
 
 ### Task 1 Details & Interfaces
 
