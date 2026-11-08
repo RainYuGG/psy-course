@@ -21,6 +21,8 @@ desktop.ini
 .claude/
 .omp/
 .opencode/
+.superpowers/
+.worktrees/
 
 # Node
 node_modules/
