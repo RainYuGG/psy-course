@@ -83,7 +83,19 @@ class TestIndexHtmlStructure:
         assert table is not None, "Missing #courses-table"
 
         headers = [th.get_text(strip=True) for th in table.select("thead th")]
-        expected_ui_headers = [f for f in COURSE_FIELD_NAMES if f != "建立時間"]
+        expected_ui_headers = [
+            "課程名稱",
+            "主辦單位",
+            "課程日期",
+            "上課時間",
+            "報名期間",
+            "費用",
+            "上課地點／方式",
+            "報名連結",
+            "是否有臨床心理師積分",
+            "積分判斷依據段落",
+            "資料來源平台",
+        ]
         assert "建立時間" not in headers
         assert headers == expected_ui_headers, (
             f"Table headers {headers} do not match expected UI headers {expected_ui_headers}"

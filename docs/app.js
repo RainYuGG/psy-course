@@ -254,40 +254,40 @@
         const badgeClass = getBadgeClass(creditStatus);
         return (
           "<tr>" +
-          '<td class="course-name-cell">' +
+          '<td class="course-name-cell" data-label="課程名稱">' +
           escapeHtml(course["課程名稱"] || "") +
           "</td>" +
-          "<td>" +
+          '<td data-label="主辦單位">' +
           escapeHtml(course["主辦單位"] || "") +
           "</td>" +
-          '<td class="date-cell">' +
+          '<td class="date-cell" data-label="課程日期">' +
           escapeHtml(course["課程日期"] || "") +
           "</td>" +
-          '<td class="time-cell">' +
+          '<td class="time-cell" data-label="上課時間">' +
           escapeHtml(course["上課時間"] || "") +
           "</td>" +
-          "<td>" +
+          '<td class="reg-period-cell" data-label="報名期間">' +
+          escapeHtml(course["報名期間"] || "") +
+          "</td>" +
+          '<td data-label="費用">' +
           escapeHtml(course["費用"] || "") +
           "</td>" +
-          "<td>" +
+          '<td data-label="上課地點／方式">' +
           escapeHtml(course["上課地點／方式"] || "") +
           "</td>" +
-          "<td>" +
+          '<td data-label="報名連結">' +
           renderRegistrationLink(course["報名連結"]) +
           "</td>" +
-          "<td><span class=\"" +
+          '<td data-label="是否有臨床心理師積分"><span class="' +
           badgeClass +
           '">' +
           escapeHtml(creditStatus) +
           "</span></td>" +
-          "<td>" +
+          '<td data-label="積分判斷依據段落">' +
           renderEvidenceCell(course["積分判斷依據段落"]) +
           "</td>" +
-          "<td>" +
+          '<td data-label="資料來源平台">' +
           escapeHtml(course["資料來源平台"] || "") +
-          "</td>" +
-          "<td>" +
-          escapeHtml(course["報名期間"] || "") +
           "</td>" +
           "</tr>"
         );

@@ -254,17 +254,17 @@ body {
   overflow-wrap: break-word;
 }
 
-.courses-table thead th:nth-child(1) { width: 17%; } /* 課程名稱 */
-.courses-table thead th:nth-child(2) { width: 9%; }  /* 主辦單位 */
-.courses-table thead th:nth-child(3) { width: 8%; }  /* 課程日期 */
-.courses-table thead th:nth-child(4) { width: 7%; }  /* 上課時間 */
-.courses-table thead th:nth-child(5) { width: 8%; }  /* 費用 */
-.courses-table thead th:nth-child(6) { width: 12%; } /* 上課地點／方式 */
-.courses-table thead th:nth-child(7) { width: 7.5%; } /* 報名連結 */
-.courses-table thead th:nth-child(8) { width: 6.5%; } /* 是否有臨床心理師積分 */
-.courses-table thead th:nth-child(9) { width: 11%; } /* 積分判斷依據段落 */
-.courses-table thead th:nth-child(10) { width: 7%; } /* 資料來源平台 */
-.courses-table thead th:nth-child(11) { width: 7%; } /* 報名期間 */
+.courses-table thead th:nth-child(1) { width: 16.5%; } /* 課程名稱 */
+.courses-table thead th:nth-child(2) { width: 9%; }    /* 主辦單位 */
+.courses-table thead th:nth-child(3) { width: 7.5%; }  /* 課程日期 */
+.courses-table thead th:nth-child(4) { width: 7%; }    /* 上課時間 */
+.courses-table thead th:nth-child(5) { width: 8.5%; }  /* 報名期間 */
+.courses-table thead th:nth-child(6) { width: 7.5%; }  /* 費用 */
+.courses-table thead th:nth-child(7) { width: 12%; }   /* 上課地點／方式 */
+.courses-table thead th:nth-child(8) { width: 7.5%; }  /* 報名連結 */
+.courses-table thead th:nth-child(9) { width: 6.5%; }  /* 是否有臨床心理師積分 */
+.courses-table thead th:nth-child(10) { width: 11%; }  /* 積分判斷依據段落 */
+.courses-table thead th:nth-child(11) { width: 7%; }   /* 資料來源平台 */
 
 .courses-table tbody td {
   padding: 0.6rem 0.5rem;
@@ -461,11 +461,99 @@ body {
 
 @media (max-width: 1024px) {
   .filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .filter-group-keyword {
-    grid-column: span 3;
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .container {
+    max-width: 100%;
+    padding: 0 0.75rem;
+  }
+
+  .table-section {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .table-responsive {
+    overflow-x: visible;
+  }
+
+  .courses-table,
+  .courses-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .courses-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .courses-table tbody tr {
+    display: block;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 0.85rem;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .courses-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.42rem 0;
+    border-bottom: 1px dashed #e2e8f0;
+    text-align: right;
+    font-size: 0.88rem;
+  }
+
+  .courses-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .courses-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: left;
+    flex: 0 0 42%;
+    max-width: 42%;
+  }
+
+  .courses-table tbody td.course-name-cell {
+    display: block;
+    text-align: left;
+    font-size: 0.98rem;
+    color: var(--brand-primary);
+    padding-bottom: 0.55rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .courses-table tbody td.course-name-cell::before {
+    display: none;
+  }
+
+  .evidence-details {
+    text-align: left;
+    width: 100%;
   }
 }
 
@@ -483,7 +571,9 @@ body {
   }
 
   .header-actions .btn {
-    flex: 1;
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
   }
 
   .formula-box {
