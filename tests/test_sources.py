@@ -328,6 +328,59 @@ class TestAtcpScraper:
         assert r2.has_clinical_credit == "是"
 
 
+class TestAtcpArticleChrome:
+    """ATCP pages print the post time next to the title; it is not the course date."""
+
+    LIST_HTML = """
+    <html><body><table><tr><td>
+      <a href="article.php?storyid=727">臺北市立聯合院失智症中心-115/5/30（六）失智症專業人員培訓課程＜心理師＞</a>
+    </td></tr></table></body></html>
+    """
+
+    ARTICLE_HTML = """
+    <html><body>
+    <div class="page-title"><h2>NEWS</h2></div>
+    <div class="row page-content"><div class="col-12">
+      <div class="news-heading mb-4">
+        <h1>臺北市立聯合院失智症中心-115/5/30（六）失智症專業人員培訓課程＜心理師＞</h1>
+        <ul class="list-unstyled clearfix">
+          <li class="float-start"><a href="#">轉知活動訊息</a></li>
+          <li class="float-start">作者：<a href="#">管理員</a></li>
+          <li class="float-start">2026-05-11 15:45:50 ‧ 402次閱讀</li>
+        </ul>
+      </div>
+      <ul class="share-buttons clearfix"><li><a href="https://www.facebook.com/sharer/sharer.php?u=x">分享</a></li></ul>
+      <div class="news-body">
+        115年聯醫失智照護配方 – 心理師<br>
+        報名日期：115/4/22～115/5/17開放報名，額滿則提前截止。<br>
+        地點 : 臺北市立聯合醫院 中興院區第一會議室<br>
+        費用 : 免費<br>
+        學分申請中：諮商心理師積分、臨床心理師積分、<br>
+        報名連結：https://reurl.cc/zQrzla
+      </div>
+    </div></div>
+    <div class="sidebar"><ul><li>繼續教育相關法規 5</li><li>轉知活動訊息 239</li></ul></div>
+    </body></html>
+    """
+
+    def test_post_time_and_registration_window_are_not_course_date(self) -> None:
+        fake_client = FakeHttpClient(
+            {
+                "https://www.atcp.org.tw/modules/news/index.php?storytopic=12": self.LIST_HTML,
+                "https://www.atcp.org.tw/modules/news/index.php?storytopic=15": "<html></html>",
+                "https://www.atcp.org.tw/modules/news/article.php?storyid=727": self.ARTICLE_HTML,
+            }
+        )
+        records, status = AtcpScraper().safe_scrape(fake_client, created_at="2026-11-08")  # type: ignore[arg-type]
+
+        assert status["status"] == "ok"
+        assert len(records) == 1
+        record = records[0]
+        assert record.course_date == "115/05/30"
+        assert record.fee == "免費"
+        assert record.registration_url == "https://reurl.cc/zQrzla"
+
+
 class TestCatalogScrapersAndFaultIsolation:
     """Tests for the 14 association catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""
 

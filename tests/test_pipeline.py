@@ -193,6 +193,36 @@ class TestDeduplicateAndMerge:
         assert result[1].course_date == "115/06/25"
 
 
+class TestFilterUpcoming:
+    """Only courses that have not finished and still accept registration are listed."""
+
+    def test_drops_finished_deadline_passed_and_undated_courses(self) -> None:
+        from datetime import date
+
+        from scraper.deduplicator import filter_upcoming
+
+        def rec(name: str, course_date: str, period: str = "") -> CourseRecord:
+            return CourseRecord(
+                course_name=name,
+                organizer="測試單位",
+                course_date=course_date,
+                registration_period=period,
+            )
+
+        courses = [
+            rec("finished", "115/10/27"),
+            rec("ongoing series", "115/09/23–115/12/02"),
+            rec("future", "116/01/24", "即日起至 116/01/24 前"),
+            rec("deadline passed", "115/12/05", "115年11月6日(五)前完成報名"),
+            rec("deadline is today", "115/12/19", "115年11月8日(日)前完成報名"),
+            rec("undated", ""),
+        ]
+
+        kept = filter_upcoming(courses, today=date(2026, 11, 8))
+
+        assert [c.course_name for c in kept] == ["ongoing series", "future", "deadline is today"]
+
+
 class TestExporters:
     """Tests for export_courses_csv and export_courses_json."""
 
@@ -259,7 +289,7 @@ class TestCliMain:
 
     def test_cli_offline_seed_generates_csv_and_json(self, tmp_path: Path) -> None:
         out_dir = tmp_path / "docs" / "data"
-        exit_code = cli_main(["--output-dir", str(out_dir), "--offline-seed"])
+        exit_code = cli_main(["--output-dir", str(out_dir), "--offline-seed", "--today", "2026-01-01"])
         assert exit_code == 0
 
         csv_path = out_dir / "courses.csv"
@@ -307,7 +337,9 @@ class TestCliMain:
 
         monkeypatch.setattr("scraper.cli.fetch_all_sources", fake_fetch_all_sources)
         out_dir = tmp_path / "live_out"
-        exit_code = cli_main(["--output-dir", str(out_dir), "--created-at", "2026-11-08"])
+        exit_code = cli_main(
+            ["--output-dir", str(out_dir), "--created-at", "2026-11-08", "--today", "2026-01-01"]
+        )
         assert exit_code == 0
 
         payload = json.loads((out_dir / "courses.json").read_text(encoding="utf-8"))
@@ -316,3 +348,26 @@ class TestCliMain:
         assert course_dict["是否有臨床心理師積分"] == "是"
         assert "TACP-115-777" in course_dict["積分判斷依據段落"]
         assert course_dict["建立時間"] == "2026-11-08"
+
+    def test_cli_drops_courses_that_already_ended(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fake_fetch_all_sources(created_at: str = ""):
+            def rec(name: str, course_date: str) -> CourseRecord:
+                return CourseRecord(
+                    course_name=name,
+                    organizer="測試單位",
+                    course_date=course_date,
+                    registration_url="https://forms.gle/x",
+                    source_platform="測試單位",
+                    created_at=created_at,
+                )
+
+            return ([rec("已結束的訓練課程", "115/10/10"), rec("尚未開始的訓練課程", "116/02/01")], [], [])
+
+        monkeypatch.setattr("scraper.cli.fetch_all_sources", fake_fetch_all_sources)
+        out_dir = tmp_path / "out"
+        assert cli_main(["--output-dir", str(out_dir), "--today", "2026-11-08"]) == 0
+
+        payload = json.loads((out_dir / "courses.json").read_text(encoding="utf-8"))
+        assert [c["課程名稱"] for c in payload["courses"]] == ["尚未開始的訓練課程"]

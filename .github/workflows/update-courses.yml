@@ -45,7 +45,7 @@ jobs:
 
       - name: Run course scraper pipeline
         if: github.event_name != 'push'
-        run: python -m scraper.cli --output-dir docs/data
+        run: python -m scraper.cli --output-dir docs/data --today "$(TZ=Asia/Taipei date +%F)"
 
       - name: Commit and push updated course data if changed
         if: github.event_name != 'push'

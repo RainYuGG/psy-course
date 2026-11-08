@@ -324,3 +324,118 @@ class TestExtractCourseFromPage:
         assert record.registration_url == detail_url
         assert record.has_clinical_credit == "是"
         assert "臨床心理師" in record.credit_evidence
+
+
+class TestCourseDateIgnoresRegistrationDates:
+    """Registration windows and byline dates must never be reported as the course date."""
+
+    def test_registration_range_is_not_course_date(self) -> None:
+        text = "報名日期：115/4/22～115/5/17開放報名，額滿則提前截止。\n地點 : 臺北市立聯合醫院"
+        assert normalize_roc_date(text) == ""
+
+    def test_slash_separated_labels_with_value_on_next_line(self) -> None:
+        text = "報名日期／\n2026-07-28 ~ 2026-11-03\n上課時間／\n2026/11/8（日）\n上課地點／"
+        assert normalize_roc_date(text) == "115/11/08"
+
+    def test_course_date_falls_back_to_title_when_body_only_has_registration_dates(self) -> None:
+        record = extract_course_from_page(
+            title="臺北市立聯合院失智症中心-115/5/30（六）失智症專業人員培訓課程＜心理師＞",
+            html="<div>報名日期：115/4/22～115/5/17開放報名，額滿則提前截止。</div>",
+            detail_url="https://www.atcp.org.tw/modules/news/article.php?storyid=727",
+            source_platform="中華民國臨床心理師公會全國聯合會",
+            created_at="2026-11-08",
+        )
+        assert record.course_date == "115/05/30"
+
+
+class TestExtractFeeRejectsNonPrice:
+    @pytest.mark.parametrize(
+        ("raw_text", "expected"),
+        [
+            ("費用：\n於", ""),
+            ("費用：（", ""),
+            ("費用：◆核心技能訓練既EFT伴侶進階八天課程", ""),
+            ("費用：（含講義、午餐）\n一般報名 $2,500", "一般報名 $2,500"),
+            (
+                "2026年會暨學術研討會費用：\n會員\n請於報名時上傳會員證明\n協辦單位師生優惠價1000元",
+                "協辦單位師生優惠價1000元",
+            ),
+            ("協辦單位師生前20名免費名額「已額滿」", ""),
+        ],
+    )
+    def test_fee_must_contain_a_price_or_free_marker(self, raw_text: str, expected: str) -> None:
+        assert extract_fee(raw_text) == expected
+
+
+class TestLocationAndRegistrationPeriodValues:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            (
+                "上課方式：\n授課地點：\n淡江大學台北校區（台北市大安區金華街199巷5號）",
+                "淡江大學台北校區（台北市大安區金華街199巷5號）",
+            ),
+            (
+                "上課地點：臺北市立聯合醫院松德院區第二講堂（臺北市松德路\n二段309號）",
+                "臺北市立聯合醫院松德院區第二講堂（臺北市松德路二段309號）",
+            ),
+            (
+                "上課地點／\n國立暨南國際大學 教育學院  （南投縣埔里鎮大學路1號）",
+                "國立暨南國際大學 教育學院 （南投縣埔里鎮大學路1號）",
+            ),
+            ("活動於南投縣埔里鎮大學路1號舉行。", "南投縣埔里鎮大學路1號"),
+        ],
+    )
+    def test_location_is_complete(self, text: str, expected: str) -> None:
+        assert extract_location_mode("研討會", text) == expected
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("報名期間：即日起至\n115年11月20日止", "即日起至115年11月20日止"),
+            ("報名日期／\n2026-07-28 ~ 2026-11-03", "2026-07-28 ~ 2026-11-03"),
+        ],
+    )
+    def test_registration_period_is_complete(self, text: str, expected: str) -> None:
+        assert extract_registration_period(text) == expected
+
+
+class TestCreditEvidenceRejectsNavigationText:
+    @pytest.mark.parametrize(
+        "label",
+        ["積分查詢", "繼續教育細則辦法", "繼續教育課程", "繼續教育積分", "您需要申請繼續教育積分嗎"],
+    )
+    def test_menu_labels_and_form_questions_are_not_evidence(self, label: str) -> None:
+        status, evidence = evaluate_clinical_credit(f"{label}\n課程簡介內容")
+        assert (status, evidence) == ("未知", "課程公告內文未提及繼續教育積分資訊")
+
+    def test_real_application_sentences_are_still_evidence(self) -> None:
+        status, evidence = evaluate_clinical_credit("※ 本課程申請相關繼續教育積分中")
+        assert (status, evidence) == ("未知", "※ 本課程申請相關繼續教育積分中")
+        status, evidence = evaluate_clinical_credit("‧本次活動將申請臨床心理師繼續教育積分認證")
+        assert status == "是"
+
+
+class TestOrganizerFromTitlePrefix:
+    ATCP = "中華民國臨床心理師公會全國聯合會"
+
+    @pytest.mark.parametrize(
+        ("title", "expected"),
+        [
+            ("國家衛生研究院-「專業整合成癮治療與復元」模式訓練工作坊─第一階段培訓", "國家衛生研究院"),
+            ("司法院少年及家事廳-社團法人中華民國社會工作師公會全國聯合會「115年度程序監理人專業培力研習-兒少專題", "司法院少年及家事廳"),
+            ("台北市政府衛生局文山區心理衛生中心-115年7月29日新住民醫事、助人工作者課程(進階)【實體上課】", "台北市政府衛生局文山區心理衛生中心"),
+            ("12.19-20 與人接觸工作坊(台中)", ATCP),
+            ("2026｜會員大會暨學術研討會", ATCP),
+        ],
+    )
+    def test_forwarded_post_organizer_comes_from_title(self, title: str, expected: str) -> None:
+        record = extract_course_from_page(
+            title=title,
+            html="<p>課程內容簡介</p>",
+            detail_url="https://www.atcp.org.tw/modules/news/article.php?storyid=1",
+            source_platform=self.ATCP,
+            default_organizer=self.ATCP,
+            created_at="2026-11-08",
+        )
+        assert record.organizer == expected

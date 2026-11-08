@@ -1,12 +1,11 @@
 """Cross-source course deduplication, TACLIP whitelist matching, and field merging."""
 
-from __future__ import annotations
-
 from dataclasses import replace
+from datetime import date
 from difflib import SequenceMatcher
 import re
 
-from scraper.extractor import evaluate_clinical_credit, normalize_roc_date
+from scraper.extractor import evaluate_clinical_credit, extract_end_date, normalize_roc_date
 from scraper.models import CourseRecord
 from scraper.sources.taclip_whitelist import TACLIP_WHITELIST_PLATFORM, WhitelistEntry
 
@@ -323,3 +322,31 @@ def deduplicate_and_merge(
     ]
     active_list.sort(key=_date_sort_key, reverse=True)
     return active_list
+
+
+def _roc_ymd_tuple(value: str) -> tuple[int, int, int] | None:
+    match = re.fullmatch(r"(\d{3})/(\d{2})/(\d{2})", (value or "").strip())
+    if not match:
+        return None
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+def filter_upcoming(courses: list[CourseRecord], today: date) -> list[CourseRecord]:
+    """Keep only courses that have not finished and whose registration has not closed."""
+    today_key = (today.year - 1911, today.month, today.day)
+    kept: list[CourseRecord] = []
+    for course in courses:
+        raw_date = (course.course_date or "").strip()
+        if not raw_date:
+            continue
+        start_key = _roc_ymd_tuple(_extract_start_date(raw_date))
+        if start_key is None:
+            continue
+        end_key = _roc_ymd_tuple(raw_date.split("–")[-1]) or start_key
+        if end_key < today_key:
+            continue
+        deadline_key = _roc_ymd_tuple(extract_end_date(course.registration_period or ""))
+        if deadline_key is not None and deadline_key < today_key:
+            continue
+        kept.append(course)
+    return kept

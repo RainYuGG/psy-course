@@ -21,10 +21,26 @@ _DATE_RANGE_REGEX = re.compile(
     + r"(?P<m2>\d{1,2})\s*(?:月|[./-])\s*(?P<d2>\d{1,2})\s*日?)?"
 )
 
+# Label separators: "：", "】：" and a trailing "／" (value then sits on the next line).
+_LABEL_SEP = r"(?:[：:]|】\s*[：:]?|／\s*$)"
+# Labels preceded by 報名/截止 (報名日期, 報名時間, 報名截止日期) describe registration, not the course.
 _COURSE_DATE_LABEL_REGEX = re.compile(
-    r"(?:課程日期|上課日期|活動日期|舉辦日期|研習日期|日期|課程時間|上課時間|活動時間|時間)\s*(?:[：:]|】\s*[：:]?)\s*([^\n]+)"
+    r"(?<!報名)(?<!截止)(?:課程日期|上課日期|活動日期|舉辦日期|研習日期|日期|課程時間|上課時間|活動時間|時間)\s*"
+    + _LABEL_SEP
+    + r"\s*([^\n]+)",
+    re.MULTILINE,
 )
-_REGISTRATION_LINE_KEYWORDS = ("報名期間", "報名日期", "報名截止", "截止日", "即日起至")
+_REGISTRATION_LINE_KEYWORDS = (
+    "報名期間",
+    "報名日期",
+    "報名時間",
+    "報名起訖",
+    "報名截止",
+    "截止日",
+    "即日起",
+    "開放報名",
+    "完成報名",
+)
 
 _TIME_RANGE_REGEX = re.compile(
     r"(?<!\d)([0-2]?\d[:：][0-5]\d)\s*[~～\-–—至到]\s*([0-2]?\d[:：][0-5]\d)(?!\d)"
@@ -45,17 +61,25 @@ _OFFICE_HOURS_LINE_KEYWORDS = (
     "聯絡時間",
 )
 
-_FEE_LABEL_REGEX = re.compile(
-    r"(?:課程費用|報名費用|報名費|收費標準|費用)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。；;]+)"
-)
-_FREE_STANDALONE_REGEX = re.compile(r"(?:免收報名費|免費參加|免費報名|全程免費|費用全免|免費)")
+_FEE_LABEL_REGEX = re.compile(r"(?:課程費用|報名費用|報名費|收費標準|費用)\s*" + _LABEL_SEP)
+_FREE_STANDALONE_REGEX = re.compile(r"(?:免收報名費|免費參加|免費報名|全程免費|費用全免|免費(?!名額))")
+# A fee value must carry a price or a free marker; bare words such as 會員 or a lone （ are not fees.
+_FEE_VALUE_REGEX = re.compile(r"(?:NT\$|\$|新台幣)\s*\d|\d[\d,]*\s*元|免費(?!名額)|免收|^\d[\d,]{2,}$")
 
 _LOCATION_LABEL_REGEX = re.compile(
-    r"(?:上課地點|辦理地點|活動地點|講座地點|研習地點|會場地點|地點|會場|場地|辦理方式|上課方式|進行方式|授課方式)\s*(?:[：:]|】\s*[：:]?)\s*([^\n]+)"
+    r"(?:上課地點|辦理地點|活動地點|講座地點|研習地點|會場地點|地點|會場|場地|辦理方式|上課方式|進行方式|授課方式)\s*"
+    + _LABEL_SEP
+)
+_CITY_NAMES = (
+    r"(?:臺北市|台北市|新北市|桃園市|臺中市|台中市|臺南市|台南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣"
+    r"|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|臺東縣|台東縣|澎湖縣)"
+)
+# Prefer an address that runs through its house number (…大學路1號) over stopping at the first 大學.
+_ADDRESS_WITH_NUMBER_REGEX = re.compile(
+    rf"({_CITY_NAMES}[^\n。；;！!？?，,]{{2,38}}?\d+(?:之\d+)?號(?:\d+樓)?)"
 )
 _ADDRESS_VENUE_REGEX = re.compile(
-    r"((?:臺北市|台北市|新北市|桃園市|臺中市|台中市|臺南市|台南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|臺東縣|台東縣|澎湖縣)"
-    r"[^\n。；;！!？?]{2,38}?(?:大學|醫院|中心|學會|學院|講堂|會議室|教室|廳|館|樓|號))"
+    rf"({_CITY_NAMES}[^\n。；;！!？?]{{2,38}}?(?:大學|醫院|中心|學會|學院|講堂|會議室|教室|廳|館|樓|號))"
 )
 _CITY_REGION_TAG_REGEX = re.compile(
     r"(?:[【\[（(]\s*(台北|臺北|新北|桃園|新竹|台中|臺中|嘉義|台南|臺南|高雄|屏東|宜蘭|花蓮|台東|臺東|北部|中部|南部|東部)(?:場|區)?\s*[】\]）)]"
@@ -82,7 +106,8 @@ _ONLINE_KEYWORDS_REGEX = re.compile(
 _IN_PERSON_KEYWORDS_REGEX = re.compile(r"(?:實體(?:課程|上課|講座|工作坊|辦理|進行)?)")
 
 _REG_PERIOD_LABEL_REGEX = re.compile(
-    r"(?:報名期間|報名日期|報名時間|報名期限|報名起訖|報名截止日期|報名截止時間|報名截止日|報名截止)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。]+)"
+    r"(?:報名期間|報名日期|報名時間|報名期限|報名起訖|報名截止日期|報名截止時間|報名截止日|報名截止)\s*"
+    + _LABEL_SEP
 )
 _REG_PERIOD_IMMEDIATE_REGEX = re.compile(
     r"(即日起\s*(?:至|起至)?\s*[^\n。；;（）()]{2,34}?(?:止|前|額滿為止)?)(?=[。，,；;\s\n]|$)"
@@ -97,6 +122,7 @@ _REG_PERIOD_DEADLINE_SENTENCE_REGEX = re.compile(
 _ORGANIZER_LABEL_REGEX = re.compile(
     r"(?:主辦單位|開課單位|辦理單位|主辦|承辦單位)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。；;]+)"
 )
+_TITLE_ORG_PREFIX_REGEX = re.compile(r"^([\u4e00-\u9fff]{3,30}?)(?:[-－—])")
 
 _KNOWN_FORM_HOSTS = (
     "forms.gle",
@@ -141,6 +167,13 @@ _CLOSED_REGISTRATION_REGEX = re.compile(
 )
 _CREDIT_SENTENCE_KEYWORDS = ("積分", "學分", "繼續教育")
 _CREDIT_NEGATION_KEYWORDS = ("不申請", "無申請", "恕不提供", "不提供積分", "無繼續教育積分", "未申請", "不提供繼續教育")
+# Menu labels and form questions (積分查詢, 繼續教育細則辦法, 您需要申請繼續教育積分嗎) are navigation
+# text, not a credit claim about this course: a segment counts as credit evidence only when it
+# carries a claim/provision keyword and is not phrased as a question.
+_CREDIT_CLAIM_KEYWORDS = (
+    "申請", "認證", "核給", "計分", "累計", "認定", "認可", "換取", "換得",
+    "計入", "獲得", "核發", "提供", "登錄",
+)
 _OTHER_PROFESSION_KEYWORDS = (
     "諮商心理師",
     "社工師",
@@ -212,8 +245,13 @@ def normalize_roc_date(text: str) -> str:
         if extracted:
             return extracted
 
-    # 3. Fallback to any date in the full text
-    return _extract_date_from_segment(text)
+    return ""
+
+
+def extract_end_date(text: str) -> str:
+    """Return the end ROC date of the first date or range in free text (e.g. a registration deadline)."""
+    found = _extract_date_from_segment(text or "")
+    return found.split("–")[-1] if found else ""
 
 
 def _pad_hhmm(hhmm: str) -> str:
@@ -262,21 +300,65 @@ def extract_time_range(text: str) -> str:
 
     return ""
 
+_LABEL_ONLY_REGEX = re.compile(r"^.{1,12}[：:／]\s*$")
+_CONTINUATION_ENDINGS = ("至", "～", "~", "-", "–", "—", "到", "起")
+
+
+def _paren_unbalanced(value: str) -> bool:
+    return value.count("（") > value.count("）") or value.count("(") > value.count(")")
+
+
+def _labelled_value(text: str, label_regex: re.Pattern[str]) -> str:
+    """Value after the first matching label, continuing onto following lines when the value is
+    empty, is itself a label, or is cut mid-phrase (open parenthesis, trailing 至)."""
+    lines = [ln.strip() for ln in (text or "").splitlines()]
+    for i, line in enumerate(lines):
+        match = label_regex.search(line)
+        if not match:
+            continue
+        value = line[match.end():].strip()
+        j = i + 1
+        while j <= i + 3 and j < len(lines) and (not value or _LABEL_ONLY_REGEX.match(value)):
+            value = lines[j]
+            j += 1
+        if not value or _LABEL_ONLY_REGEX.match(value):
+            continue
+        while (
+            j <= i + 5
+            and j < len(lines)
+            and lines[j]
+            and (_paren_unbalanced(value) or value.endswith(_CONTINUATION_ENDINGS))
+        ):
+            value += lines[j]
+            j += 1
+        return value
+    return ""
+
+
+def _normalize_fee(value: str) -> str:
+    if len(value) > 40:
+        match = _FEE_VALUE_REGEX.search(value)
+        value = match.group(0) if match else value[:40]
+    is_free = any(k in value for k in ("免收報名費", "免費")) or re.search(r"(?<![0-9,])0\s*元", value)
+    if is_free and "$" not in value and not re.search(r"[1-9][\d,]*\s*元", value):
+        return "免費"
+    return value
+
+
 def extract_fee(text: str) -> str:
-    """Extract fee description from labels or standalone free-of-charge patterns."""
+    """Extract a price or free marker from a fee label (or the few lines after it)."""
     if not text:
         return ""
 
-    label_match = _FEE_LABEL_REGEX.search(text)
-    if label_match:
-        raw_fee = label_match.group(1).strip().rstrip("。；;，, ")
-        if raw_fee:
-            if (
-                any(k in raw_fee for k in ("免收報名費", "免費"))
-                or re.search(r"(?<![0-9,])0\s*元", raw_fee)
-            ) and "$" not in raw_fee and not re.search(r"[1-9][\d,]*\s*元", raw_fee):
-                return "免費"
-            return raw_fee
+    lines = [ln.strip() for ln in text.splitlines()]
+    for i, line in enumerate(lines):
+        match = _FEE_LABEL_REGEX.search(line)
+        if not match:
+            continue
+        for candidate in [line[match.end():], *lines[i + 1 : i + 5]]:
+            candidate = re.split(r"[。；;]", candidate)[0].strip().rstrip("，, ")
+            if candidate and _FEE_VALUE_REGEX.search(candidate):
+                return _normalize_fee(candidate)
 
     if _FREE_STANDALONE_REGEX.search(text):
         return "免費"
@@ -288,19 +370,17 @@ def extract_location_mode(title: str, text: str, organizer: str = "") -> str:
     """Extract labeled location/mode or detect online/in-person/venue from title, text, and organizer."""
     combined = f"{title or ''}\n{text or ''}"
 
-    label_match = _LOCATION_LABEL_REGEX.search(text or "")
-    if label_match:
-        loc_value = re.sub(r"\s+", " ", label_match.group(1)).strip().rstrip("。；; ")
-        if loc_value:
-            has_online = bool(_ONLINE_KEYWORDS_REGEX.search(loc_value))
-            has_in_person = bool(_IN_PERSON_KEYWORDS_REGEX.search(loc_value))
-            if has_online and has_in_person:
-                return (
-                    f"實體、線上混合（{loc_value}）"
-                    if loc_value not in ("實體、線上混合", "實體與線上同步")
-                    else loc_value
-                )
-            return loc_value
+    loc_value = re.sub(r"\s+", " ", _labelled_value(text, _LOCATION_LABEL_REGEX)).strip().rstrip("。；; ")
+    if loc_value:
+        has_online = bool(_ONLINE_KEYWORDS_REGEX.search(loc_value))
+        has_in_person = bool(_IN_PERSON_KEYWORDS_REGEX.search(loc_value))
+        if has_online and has_in_person:
+            return (
+                f"實體、線上混合（{loc_value}）"
+                if loc_value not in ("實體、線上混合", "實體與線上同步")
+                else loc_value
+            )
+        return loc_value
 
     has_online_any = bool(_ONLINE_KEYWORDS_REGEX.search(combined))
     has_in_person_any = bool(_IN_PERSON_KEYWORDS_REGEX.search(combined))
@@ -310,7 +390,7 @@ def extract_location_mode(title: str, text: str, organizer: str = "") -> str:
     if has_online_any:
         return "線上"
 
-    addr_match = _ADDRESS_VENUE_REGEX.search(text or "")
+    addr_match = _ADDRESS_WITH_NUMBER_REGEX.search(text or "") or _ADDRESS_VENUE_REGEX.search(text or "")
     if addr_match:
         return re.sub(r"\s+", " ", addr_match.group(1)).strip()
 
@@ -335,11 +415,9 @@ def extract_registration_period(text: str) -> str:
     if not text:
         return ""
 
-    label_match = _REG_PERIOD_LABEL_REGEX.search(text)
-    if label_match:
-        val = re.sub(r"\s+", " ", label_match.group(1)).strip().rstrip("。；; ")
-        if val:
-            return val
+    val = re.sub(r"\s+", " ", _labelled_value(text, _REG_PERIOD_LABEL_REGEX)).split("。")[0].strip().rstrip("；; ")
+    if val:
+        return val
 
     imm_match = _REG_PERIOD_IMMEDIATE_REGEX.search(text)
     if imm_match:
@@ -460,12 +538,16 @@ def evaluate_clinical_credit(
     if not text:
         return ("未知", "課程公告內文未提及繼續教育積分資訊")
 
-    # Split text into candidate sentences/lines
+    # Split text into candidate sentences/lines; require a credit-claim keyword so nav menu
+    # labels (積分查詢, 繼續教育積分...) and form questions are not reported as evidence.
     raw_segments = re.split(r"[\n\r。！？!?；;]+", text)
     credit_sentences = [
         seg.strip()
         for seg in raw_segments
-        if seg.strip() and any(kw in seg for kw in _CREDIT_SENTENCE_KEYWORDS)
+        if seg.strip()
+        and any(kw in seg for kw in _CREDIT_SENTENCE_KEYWORDS)
+        and any(kw in seg for kw in _CREDIT_CLAIM_KEYWORDS)
+        and not seg.strip().endswith(("嗎", "？", "?"))
     ]
 
     if not credit_sentences:
@@ -494,7 +576,14 @@ def evaluate_clinical_credit(
     return ("未知", credit_sentences[0])
 
 
-def _extract_organizer(text: str, default_organizer: str, source_platform: str) -> str:
+def _extract_organizer(
+    title: str, text: str, default_organizer: str, source_platform: str
+) -> str:
+    # Forwarded posts (轉知) carry the true organizer as a CJK prefix before the first dash,
+    # e.g. 「國家衛生研究院-『…』模式訓練工作坊」; titles starting with dates/digits don't match.
+    prefix_match = _TITLE_ORG_PREFIX_REGEX.match((title or "").strip())
+    if prefix_match:
+        return prefix_match.group(1).strip()
     match = _ORGANIZER_LABEL_REGEX.search(text or "")
     if match:
         org = match.group(1).strip().rstrip("。；; ")
@@ -532,7 +621,7 @@ def extract_course_from_page(
         if short_match:
             clean_title = short_match.group(1).strip()
 
-    organizer = _extract_organizer(text, default_organizer, source_platform)
+    organizer = _extract_organizer(clean_title, text, default_organizer, source_platform)
     course_date = normalize_roc_date(text) or normalize_roc_date(clean_title)
     course_time = extract_time_range(text) or extract_time_range(clean_title)
     if not course_time:

@@ -6,7 +6,7 @@ import argparse
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from scraper.deduplicator import deduplicate_and_merge
+from scraper.deduplicator import deduplicate_and_merge, filter_upcoming
 from scraper.exporter import export_courses_csv, export_courses_json
 from scraper.models import CourseRecord
 from scraper.sources import fetch_all_sources
@@ -124,6 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Override scrape date in YYYY-MM-DD format (defaults to today).",
     )
+    parser.add_argument(
+        "--today",
+        type=str,
+        default="",
+        help="Override current date in YYYY-MM-DD for upcoming-course filtering (defaults to today).",
+    )
     return parser
 
 
@@ -143,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             raw_courses, whitelist_entries, statuses = build_offline_seed_data(created_at)
 
     merged_courses = deduplicate_and_merge(raw_courses, whitelist=whitelist_entries)
+    merged_courses = filter_upcoming(merged_courses, date.fromisoformat(args.today) if args.today else date.today())
 
     output_dir: Path = args.output_dir
     csv_path = output_dir / "courses.csv"
