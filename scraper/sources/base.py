@@ -20,7 +20,54 @@ NON_COURSE_KEYWORDS: tuple[str, ...] = (
     "辦法修正",
     "獎學金",
     "徵稿",
+    "論文徵稿",
+    "花絮回顧",
+    "活動紀實",
+    "遊行實紀",
     "休假公告",
+    "認證督導名單",
+    "師資名單",
+)
+
+GENERIC_MENU_TITLES: frozenset[str] = frozenset(
+    {
+        "遊療專業培訓",
+        "學術研討會",
+        "通訊繼續教育學分",
+        "繼續教育課程",
+        "繼續教育專區",
+        "繼續教育補充專區",
+        "一般課程",
+        "年會專區",
+        "查看近期課程",
+        "精神分析工作坊",
+        "跨領域工作坊",
+        "入門課程",
+        "臨床進階課程",
+        "歷年課程",
+        "近期課程",
+        "課程專區",
+        "專業學習資源",
+        "一般大眾成長課程",
+        "人才培訓",
+        "志工培訓",
+        "培訓成果",
+        "認證督導名單",
+        "相關單位繼續教育課程",
+        "學會主辦課程報名",
+        "培訓課程",
+        "課程資訊",
+        "課程查詢",
+        "課程總覽",
+        "研習活動公告",
+        "研習活動報名",
+        "國內研討會",
+        "國際論文精選與國際會議",
+        "活動與消息",
+        "最新消息",
+        "本會活動訊息",
+        "轉知活動訊息",
+    }
 )
 
 COURSE_INDICATOR_KEYWORDS: tuple[str, ...] = (
@@ -47,10 +94,29 @@ def is_likely_course_title(title: str) -> bool:
     if not cleaned or len(cleaned) < 4:
         return False
 
-    # Pure job postings or administrative records
-    if any(job_kw in cleaned for job_kw in ("誠徵", "徵才", "職缺", "錄取名單", "會議紀錄", "會員大會紀錄", "休假公告")):
+    if cleaned in GENERIC_MENU_TITLES:
         return False
 
+    # Pure job postings, call-for-papers, recaps, or administrative records
+    if any(
+        job_kw in cleaned
+        for job_kw in (
+            "誠徵",
+            "徵才",
+            "職缺",
+            "錄取名單",
+            "會議紀錄",
+            "會員大會紀錄",
+            "休假公告",
+            "論文徵稿",
+            "花絮回顧",
+            "活動紀實",
+            "遊行實紀",
+            "認證督導名單",
+            "開啟「Spreadsheet",
+        )
+    ):
+        return False
     has_non_course = any(kw in cleaned for kw in NON_COURSE_KEYWORDS)
     has_course_indicator = any(kw in cleaned for kw in COURSE_INDICATOR_KEYWORDS)
 

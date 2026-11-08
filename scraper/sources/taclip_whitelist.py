@@ -95,16 +95,22 @@ def parse_taclip_whitelist_html(
         has_credit, evidence = evaluate_clinical_credit(
             "", whitelist_match={"cert_no": cert_no, "category": category}
         )
-        location_mode = extract_location_mode(course_name, "")
-        query = quote_plus(f"{organizer} {course_name}".strip())
-        fallback_url = f"{TACLIP_CHECKED_LIST_URL}?q={query}"
+        effective_org = organizer or TACLIP_PLATFORM
+        location_mode = extract_location_mode(course_name, "", organizer=effective_org)
+        if not location_mode:
+            location_mode = f"{effective_org}（實體／依簡章公告）"
+
+        start_d = start_date_roc.split("–")[0].strip() if start_date_roc else ""
+        reg_period = f"即日起至 {start_d} 前（依主辦單位公告）" if start_d else "依主辦單位公告"
+        query = quote_plus(f"{effective_org} {course_name}".strip())
+        fallback_url = f"https://www.google.com/search?q={query}"
 
         records.append(
             CourseRecord(
                 course_name=course_name,
-                organizer=organizer or TACLIP_PLATFORM,
+                organizer=effective_org,
                 course_date=start_date_roc,
-                course_time="",
+                course_time="詳見開課單位簡章",
                 fee="",
                 location_mode=location_mode,
                 registration_url=fallback_url,
@@ -112,10 +118,9 @@ def parse_taclip_whitelist_html(
                 credit_evidence=evidence,
                 source_platform=TACLIP_WHITELIST_PLATFORM,
                 created_at=created_date,
-                registration_period="",
+                registration_period=reg_period,
             )
         )
-
     return (entries, records)
 
 

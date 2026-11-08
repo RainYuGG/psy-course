@@ -130,9 +130,11 @@ def match_whitelist_entry(
 
 
 def _is_whitelist_only_record(record: CourseRecord) -> bool:
+    url = record.registration_url or ""
     return (
         record.source_platform == TACLIP_WHITELIST_PLATFORM
-        or "taclip.org.tw/checked-list/?q=" in (record.registration_url or "")
+        or "taclip.org.tw/checked-list/?q=" in url
+        or "google.com/search?q=" in url
     )
 
 
@@ -141,12 +143,11 @@ def _url_priority(url: str) -> int:
     if not u:
         return 0
     lower = u.lower()
-    if "taclip.org.tw/checked-list/?q=" in lower:
+    if "taclip.org.tw/checked-list/?q=" in lower or "google.com/search?q=" in lower:
         return 10
     if any(host in lower for host in _EXTERNAL_FORM_HOSTS):
         return 100
     return 60
-
 
 def _credit_status_priority(status: str) -> int:
     if status == "是":
@@ -229,19 +230,31 @@ def _merge_two_records(first: CourseRecord, second: CourseRecord) -> CourseRecor
     else:
         course_date = detailed.course_date or secondary.course_date
 
-    course_time = detailed.course_time or secondary.course_time
+    def _is_fallback_time(val: str) -> bool:
+        return not val or val in ("詳見開課單位簡章", "詳見簡章")
+
+    course_time = (
+        detailed.course_time
+        if not _is_fallback_time(detailed.course_time)
+        else (secondary.course_time if not _is_fallback_time(secondary.course_time) else (detailed.course_time or secondary.course_time))
+    )
     fee = detailed.fee or secondary.fee
 
-    # Prefer longer/more specific location_mode
-    if detailed.location_mode and secondary.location_mode:
+    def _is_fallback_loc(val: str) -> bool:
+        return not val or "依簡章公告" in val
+
+    if not _is_fallback_loc(detailed.location_mode) and not _is_fallback_loc(secondary.location_mode):
         location_mode = (
             detailed.location_mode
             if len(detailed.location_mode) >= len(secondary.location_mode)
             else secondary.location_mode
         )
+    elif not _is_fallback_loc(detailed.location_mode):
+        location_mode = detailed.location_mode
+    elif not _is_fallback_loc(secondary.location_mode):
+        location_mode = secondary.location_mode
     else:
         location_mode = detailed.location_mode or secondary.location_mode
-
     registration_url = (
         detailed.registration_url
         if _url_priority(detailed.registration_url) >= _url_priority(secondary.registration_url)

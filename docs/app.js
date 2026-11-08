@@ -245,7 +245,7 @@
     function renderRows(courses) {
       if (!courses.length) {
         tbodyEl.innerHTML =
-          '<tr><td colspan="12" class="empty-cell">沒有符合目前篩選條件的課程，請調整篩選條件後再試。</td></tr>';
+          '<tr><td colspan="11" class="empty-cell">沒有符合目前篩選條件的課程，請調整篩選條件後再試。</td></tr>';
         return;
       }
 
@@ -285,9 +285,6 @@
           "</td>" +
           "<td>" +
           escapeHtml(course["資料來源平台"] || "") +
-          "</td>" +
-          '<td class="created-cell">' +
-          escapeHtml(course["建立時間"] || "") +
           "</td>" +
           "<td>" +
           escapeHtml(course["報名期間"] || "") +

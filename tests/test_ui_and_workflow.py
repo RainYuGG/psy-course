@@ -75,7 +75,7 @@ class TestIndexHtmlStructure:
             el = soup.find(id=element_id)
             assert el is not None, f"Missing required element #{element_id}"
 
-    def test_index_html_table_has_exact_12_column_headers_in_order(self) -> None:
+    def test_index_html_table_has_expected_column_headers_without_created_at(self) -> None:
         html = (DOCS_DIR / "index.html").read_text(encoding="utf-8")
         soup = BeautifulSoup(html, "lxml")
 
@@ -83,10 +83,11 @@ class TestIndexHtmlStructure:
         assert table is not None, "Missing #courses-table"
 
         headers = [th.get_text(strip=True) for th in table.select("thead th")]
-        assert headers == COURSE_FIELD_NAMES, (
-            f"Table headers {headers} do not match COURSE_FIELD_NAMES {COURSE_FIELD_NAMES}"
+        expected_ui_headers = [f for f in COURSE_FIELD_NAMES if f != "建立時間"]
+        assert "建立時間" not in headers
+        assert headers == expected_ui_headers, (
+            f"Table headers {headers} do not match expected UI headers {expected_ui_headers}"
         )
-
 
 class TestStyleCssAndAppJs:
     """Verify docs/style.css and docs/app.js implement required client-side behaviors."""

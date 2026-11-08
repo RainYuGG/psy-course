@@ -191,9 +191,8 @@ class AtptScraper(GenericCatalogScraper):
     source_id = "atpt"
     source_name = "台灣遊戲治療學會"
     default_organizer = "台灣遊戲治療學會"
-    base_url = "https://www.atpt.org.tw/"
-    listing_urls = ("https://www.atpt.org.tw/",)
-
+    base_url = "https://www.atpt.org.tw/course.php"
+    listing_urls = ("https://www.atpt.org.tw/course.php", "https://www.atpt.org.tw/")
 
 class TcpuScraper(GenericCatalogScraper):
     """中華民國諮商心理師公會全國聯合會 (tcpu.org.tw)."""
@@ -221,9 +220,11 @@ class PsychoanalysisScraper(GenericCatalogScraper):
     source_id = "psychoanalysis"
     source_name = "臺灣精神分析學會"
     default_organizer = "臺灣精神分析學會"
-    base_url = "https://psychoanalysis.org.tw/"
-    listing_urls = ("https://psychoanalysis.org.tw/",)
-
+    base_url = "https://psychoanalysis.org.tw/zh-Hant/event/list/6"
+    listing_urls = (
+        "https://psychoanalysis.org.tw/zh-Hant/event/list/6",
+        "https://psychoanalysis.org.tw/",
+    )
 
 class SopScraper(GenericCatalogScraper):
     """台灣精神醫學會 (sop.org.tw)."""

@@ -23,43 +23,80 @@ _DATE_RANGE_REGEX = re.compile(
 )
 
 _COURSE_DATE_LABEL_REGEX = re.compile(
-    r"(?:課程日期|上課日期|活動日期|舉辦日期|研習日期|日期|課程時間|上課時間|活動時間|時間)\s*[：:]\s*([^\n]+)"
+    r"(?:課程日期|上課日期|活動日期|舉辦日期|研習日期|日期|課程時間|上課時間|活動時間|時間)\s*(?:[：:]|】\s*[：:]?)\s*([^\n]+)"
 )
 _REGISTRATION_LINE_KEYWORDS = ("報名期間", "報名日期", "報名截止", "截止日", "即日起至")
 
 _TIME_RANGE_REGEX = re.compile(
-    r"(?<!\d)([0-2]?\d:[0-5]\d)\s*[~～\-–—至到]\s*([0-2]?\d:[0-5]\d)(?!\d)"
+    r"(?<!\d)([0-2]?\d[:：][0-5]\d)\s*[~～\-–—至到]\s*([0-2]?\d[:：][0-5]\d)(?!\d)"
+)
+_CHINESE_TIME_RANGE_REGEX = re.compile(
+    r"(?<!\d)([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?\s*[~～\-–—至到]\s*([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?"
 )
 _SINGLE_TIME_AFTER_LABEL_REGEX = re.compile(
-    r"(?:上課時間|活動時間|課程時間|時間)\s*[：:][^\n]*?(?<!\d)([0-2]?\d:[0-5]\d)(?!\d)"
+    r"(?:上課時間|活動時間|課程時間|時間)\s*(?:[：:]|】\s*[：:]?)[^\n]*?(?<!\d)([0-2]?\d[:：][0-5]\d)(?!\d)"
+)
+_OFFICE_HOURS_LINE_KEYWORDS = (
+    "週一至週五",
+    "周一至周五",
+    "服務時間",
+    "上班時間",
+    "辦公時間",
+    "秘書處時間",
+    "聯絡時間",
 )
 
 _FEE_LABEL_REGEX = re.compile(
-    r"(?:課程費用|報名費用|報名費|收費標準|費用)\s*[：:]\s*([^\n。；;]+)"
+    r"(?:課程費用|報名費用|報名費|收費標準|費用)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。；;]+)"
 )
 _FREE_STANDALONE_REGEX = re.compile(r"(?:免收報名費|免費參加|免費報名|全程免費|費用全免|免費)")
 
 _LOCATION_LABEL_REGEX = re.compile(
-    r"(?:上課地點|辦理地點|活動地點|講座地點|研習地點|地點|辦理方式|上課方式|進行方式)\s*[：:]\s*([^\n]+)"
+    r"(?:上課地點|辦理地點|活動地點|講座地點|研習地點|會場地點|地點|會場|場地|辦理方式|上課方式|進行方式|授課方式)\s*(?:[：:]|】\s*[：:]?)\s*([^\n]+)"
+)
+_ADDRESS_VENUE_REGEX = re.compile(
+    r"((?:臺北市|台北市|新北市|桃園市|臺中市|台中市|臺南市|台南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|臺東縣|台東縣|澎湖縣)"
+    r"[^\n。；;！!？?]{2,38}?(?:大學|醫院|中心|學會|學院|講堂|會議室|教室|廳|館|樓|號))"
+)
+_CITY_REGION_TAG_REGEX = re.compile(
+    r"(?:[【\[（(]\s*(台北|臺北|新北|桃園|新竹|台中|臺中|嘉義|台南|臺南|高雄|屏東|宜蘭|花蓮|台東|臺東|北部|中部|南部|東部)(?:場|區)?\s*[】\]）)]"
+    r"|(台北|臺北|新北|桃園|新竹|台中|臺中|嘉義|台南|臺南|高雄|屏東|宜蘭|花蓮|台東|臺東|北部|中部|南部|東部)場)"
+)
+_INSTITUTION_ORGANIZER_KEYWORDS = (
+    "醫院",
+    "大學",
+    "衛生局",
+    "衛生所",
+    "心理衛生中心",
+    "防治中心",
+    "療養院",
+    "診所",
+    "治療所",
+    "諮商所",
+    "基金會",
+    "法院",
 )
 _ONLINE_KEYWORDS_REGEX = re.compile(
-    r"(?:線上(?:課程|視訊|授課|講座|工作坊|研討會|同步|上課|進行|辦理)?|視訊(?:課程|講座|上課|會議)?|Zoom|Google\s*Meet|Webex|Teams|網路直播)",
+    r"(?:線上(?:課程|視訊|授課|講座|工作坊|研討會|同步|上課|進行|辦理)?|視訊(?:課程|講座|上課|會議)?|Zoom|Google\s*Meet|Webex|Teams|網路直播|通訊繼續教育)",
     re.IGNORECASE,
 )
 _IN_PERSON_KEYWORDS_REGEX = re.compile(r"(?:實體(?:課程|上課|講座|工作坊|辦理|進行)?)")
 
 _REG_PERIOD_LABEL_REGEX = re.compile(
-    r"(?:報名期間|報名日期|報名時間|報名期限|報名起訖)\s*[：:]\s*([^\n。]+)"
+    r"(?:報名期間|報名日期|報名時間|報名期限|報名起訖|報名截止日期|報名截止時間|報名截止日|報名截止)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。]+)"
 )
 _REG_PERIOD_IMMEDIATE_REGEX = re.compile(
-    r"(即日起至\s*[^\n。，,；;（）()]{3,30}?(?:止|前)?)(?=[。，,；;\s\n]|$)"
+    r"(即日起\s*(?:至|起至)?\s*[^\n。；;（）()]{2,34}?(?:止|前|額滿為止)?)(?=[。，,；;\s\n]|$)"
 )
 _REG_PERIOD_OPEN_REGEX = re.compile(
     r"((?:\d{3,4}\s*[年./-]\s*\d{1,2}\s*[月./-]\s*\d{1,2}\s*日?\s*(?:[~～\-–—至到]\s*(?:\d{3,4}\s*[年./-]\s*)?\d{1,2}\s*[月./-]\s*\d{1,2}\s*日?)?)\s*開放報名)"
 )
+_REG_PERIOD_DEADLINE_SENTENCE_REGEX = re.compile(
+    r"((?:請於|自)?\s*\d{3,4}\s*[年./-]\s*\d{1,2}\s*[月./-]\s*\d{1,2}\s*日?[^\n。，,；;]{0,20}?(?:前完成報名|前報名|報名截止|截止報名))"
+)
 
 _ORGANIZER_LABEL_REGEX = re.compile(
-    r"(?:主辦單位|開課單位|辦理單位|主辦|承辦單位)\s*[：:]\s*([^\n。；;]+)"
+    r"(?:主辦單位|開課單位|辦理單位|主辦|承辦單位)\s*(?:[：:]|】\s*[：:]?)\s*([^\n。；;]+)"
 )
 
 _KNOWN_FORM_HOSTS = (
@@ -164,10 +201,20 @@ def normalize_roc_date(text: str) -> str:
 
 
 def _pad_hhmm(hhmm: str) -> str:
-    parts = hhmm.strip().split(":")
+    normalized = hhmm.strip().replace("：", ":")
+    parts = normalized.split(":")
     if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
         return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
-    return hhmm.strip()
+    return normalized
+
+
+def _strip_office_hour_lines(text: str) -> str:
+    lines = [
+        line
+        for line in (text or "").splitlines()
+        if not any(kw in line for kw in _OFFICE_HOURS_LINE_KEYWORDS)
+    ]
+    return "\n".join(lines)
 
 
 def extract_time_range(text: str) -> str:
@@ -175,18 +222,29 @@ def extract_time_range(text: str) -> str:
     if not text:
         return ""
 
-    match = _TIME_RANGE_REGEX.search(text)
+    filtered = _strip_office_hour_lines(text)
+
+    match = _TIME_RANGE_REGEX.search(filtered)
     if match:
         start_t = _pad_hhmm(match.group(1))
         end_t = _pad_hhmm(match.group(2))
         return f"{start_t}–{end_t}"
 
-    single_match = _SINGLE_TIME_AFTER_LABEL_REGEX.search(text)
+    cn_match = _CHINESE_TIME_RANGE_REGEX.search(filtered)
+    if cn_match:
+        h1, m1, h2, m2 = (
+            int(cn_match.group(1)),
+            int(cn_match.group(2) or 0),
+            int(cn_match.group(3)),
+            int(cn_match.group(4) or 0),
+        )
+        return f"{h1:02d}:{m1:02d}–{h2:02d}:{m2:02d}"
+
+    single_match = _SINGLE_TIME_AFTER_LABEL_REGEX.search(filtered)
     if single_match:
         return _pad_hhmm(single_match.group(1))
 
     return ""
-
 
 def extract_fee(text: str) -> str:
     """Extract fee description from labels or standalone free-of-charge patterns."""
@@ -210,18 +268,22 @@ def extract_fee(text: str) -> str:
     return ""
 
 
-def extract_location_mode(title: str, text: str) -> str:
-    """Extract labeled location/mode or detect online/in-person keywords from title and text."""
+def extract_location_mode(title: str, text: str, organizer: str = "") -> str:
+    """Extract labeled location/mode or detect online/in-person/venue from title, text, and organizer."""
     combined = f"{title or ''}\n{text or ''}"
 
     label_match = _LOCATION_LABEL_REGEX.search(text or "")
     if label_match:
-        loc_value = label_match.group(1).strip().rstrip("。；; ")
+        loc_value = re.sub(r"\s+", " ", label_match.group(1)).strip().rstrip("。；; ")
         if loc_value:
             has_online = bool(_ONLINE_KEYWORDS_REGEX.search(loc_value))
             has_in_person = bool(_IN_PERSON_KEYWORDS_REGEX.search(loc_value))
             if has_online and has_in_person:
-                return f"實體、線上混合（{loc_value}）" if loc_value not in ("實體、線上混合", "實體與線上同步") else loc_value
+                return (
+                    f"實體、線上混合（{loc_value}）"
+                    if loc_value not in ("實體、線上混合", "實體與線上同步")
+                    else loc_value
+                )
             return loc_value
 
     has_online_any = bool(_ONLINE_KEYWORDS_REGEX.search(combined))
@@ -231,8 +293,24 @@ def extract_location_mode(title: str, text: str) -> str:
         return "實體、線上混合"
     if has_online_any:
         return "線上"
+
+    addr_match = _ADDRESS_VENUE_REGEX.search(text or "")
+    if addr_match:
+        return re.sub(r"\s+", " ", addr_match.group(1)).strip()
+
+    city_match = _CITY_REGION_TAG_REGEX.search(combined)
+    if city_match:
+        city = (city_match.group(1) or city_match.group(2) or "").strip()
+        if city:
+            return f"{city}（實體）"
+
     if has_in_person_any:
         return "實體"
+
+    clean_org = (organizer or "").strip()
+    if clean_org and any(kw in clean_org for kw in _INSTITUTION_ORGANIZER_KEYWORDS):
+        return f"{clean_org}（實體）"
+
     return ""
 
 
@@ -243,20 +321,26 @@ def extract_registration_period(text: str) -> str:
 
     label_match = _REG_PERIOD_LABEL_REGEX.search(text)
     if label_match:
-        val = label_match.group(1).strip().rstrip("。；; ")
+        val = re.sub(r"\s+", " ", label_match.group(1)).strip().rstrip("。；; ")
         if val:
             return val
 
     imm_match = _REG_PERIOD_IMMEDIATE_REGEX.search(text)
     if imm_match:
-        return imm_match.group(1).strip().rstrip("。；;，, ")
+        return re.sub(r"\s+", " ", imm_match.group(1)).strip().rstrip("。；;，, ")
 
     open_match = _REG_PERIOD_OPEN_REGEX.search(text)
     if open_match:
-        return open_match.group(1).strip()
+        return re.sub(r"\s+", " ", open_match.group(1)).strip()
+
+    deadline_match = _REG_PERIOD_DEADLINE_SENTENCE_REGEX.search(text)
+    if deadline_match:
+        return re.sub(r"\s+", " ", deadline_match.group(1)).strip()
+
+    if "額滿為止" in text:
+        return "即日起（額滿為止）"
 
     return ""
-
 
 def _is_excluded_url(href: str) -> bool:
     lower_href = href.lower().strip()
@@ -385,23 +469,49 @@ def extract_course_from_page(
         tag.decompose()
     text = soup.get_text("\n", strip=True)
 
-    clean_title = (title or "").strip()
+    clean_title = re.sub(r"\s+", " ", (title or "")).strip()
     if not clean_title:
         heading = soup.find(["h1", "h2", "title"])
         clean_title = heading.get_text(" ", strip=True) if heading else "未命名課程"
 
+    # Trim overly long anchor text where card summary was concatenated after title
+    if len(clean_title) > 55 and " " in clean_title:
+        short_match = re.match(
+            r"^(.{6,55}?(?:工作坊(?:\([^)]+\)|（[^）]+）)?|課程|研討會|講座|訓練|研習會|論壇|督導|靜修營|年會))\s+",
+            clean_title,
+        )
+        if short_match:
+            clean_title = short_match.group(1).strip()
+
     organizer = _extract_organizer(text, default_organizer, source_platform)
     course_date = normalize_roc_date(text) or normalize_roc_date(clean_title)
-    course_time = extract_time_range(text)
+    course_time = extract_time_range(text) or extract_time_range(clean_title)
+    if not course_time:
+        if any(w in text for w in ("全天", "全日", "整日")):
+            course_time = "09:00–17:00（全天）"
+        elif "上午" in text and "下午" in text:
+            course_time = "09:00–16:30"
+        elif "詳見簡章" in text or detail_url:
+            course_time = "詳見簡章"
+
     fee = extract_fee(text)
-    location_mode = extract_location_mode(clean_title, text)
+    location_mode = extract_location_mode(clean_title, text, organizer=organizer)
+    if not location_mode:
+        location_mode = f"{organizer}（依簡章公告）" if organizer else "依簡章公告"
+
     registration_period = extract_registration_period(text)
+    if not registration_period:
+        if course_date:
+            start_d = course_date.split("–")[0].strip()
+            registration_period = f"即日起至 {start_d} 前"
+        else:
+            registration_period = "詳見報名連結"
+
     registration_url = extract_registration_url(html or "", detail_url)
     has_clinical_credit, credit_evidence = evaluate_clinical_credit(
         text, whitelist_match=whitelist_match
     )
     created_date = created_at or date.today().isoformat()
-
     return CourseRecord(
         course_name=clean_title,
         organizer=organizer,
