@@ -23,10 +23,22 @@ NON_COURSE_KEYWORDS: tuple[str, ...] = (
     "論文徵稿",
     "花絮回顧",
     "活動紀實",
+    "課程回顧",
     "遊行實紀",
     "休假公告",
     "認證督導名單",
     "師資名單",
+    "口試結果",
+    "甄審",
+    "特約商店",
+    "決標公告",
+    "採購案",
+    "常年會費",
+    "贊助繳費",
+    "訂閱調查",
+    "已額滿",
+    "報名截止",
+    "已截止",
 )
 
 GENERIC_MENU_TITLES: frozenset[str] = frozenset(
@@ -67,6 +79,19 @@ GENERIC_MENU_TITLES: frozenset[str] = frozenset(
         "最新消息",
         "本會活動訊息",
         "轉知活動訊息",
+        "線上課程",
+        "臨床課程",
+        "課程報名",
+        "精神分析臨床工作坊",
+        "年會消息公告",
+        "年會暨研討會",
+        "歷屆年會",
+        "近期年會",
+        "年會論文集",
+        "工作坊 Workshop",
+        "2024年會系列活動",
+        "2025年會系列活動",
+        "2026年會系列活動",
     }
 )
 
@@ -85,22 +110,20 @@ COURSE_INDICATOR_KEYWORDS: tuple[str, ...] = (
     "繼續教育",
     "學分班",
     "年會",
+    "靜修營",
+    "共學",
 )
 
 
 def is_likely_course_title(title: str) -> bool:
-    """Return False if title matches non-course keywords without course indicators."""
+    """Return True only if title has a course indicator and no disqualifying non-course keywords."""
     cleaned = (title or "").strip()
-    if not cleaned or len(cleaned) < 4:
+    if not cleaned or len(cleaned) < 5 or cleaned in GENERIC_MENU_TITLES:
         return False
 
-    if cleaned in GENERIC_MENU_TITLES:
-        return False
-
-    # Pure job postings, call-for-papers, recaps, or administrative records
     if any(
-        job_kw in cleaned
-        for job_kw in (
+        bad_kw in cleaned
+        for bad_kw in (
             "誠徵",
             "徵才",
             "職缺",
@@ -111,19 +134,42 @@ def is_likely_course_title(title: str) -> bool:
             "論文徵稿",
             "花絮回顧",
             "活動紀實",
+            "課程回顧",
             "遊行實紀",
             "認證督導名單",
             "開啟「Spreadsheet",
+            "組織架構",
+            "申訴",
+            "理事長簡介",
+            "公會簡介",
+            "公會章程",
+            "網站連結",
+            "政府機關",
+            "地區公會",
+            "其他線上學習網站",
+            "資深優良",
+            "口試結果",
+            "特約商店",
+            "決標公告",
+            "採購案",
+            "常年會費",
+            "贊助繳費",
+            "訂閱調查",
+            "人選參考名冊",
+            "已額滿",
+            "報名截止",
+            "已截止",
         )
     ):
         return False
+
     has_non_course = any(kw in cleaned for kw in NON_COURSE_KEYWORDS)
     has_course_indicator = any(kw in cleaned for kw in COURSE_INDICATOR_KEYWORDS)
 
     if has_non_course and not has_course_indicator:
         return False
 
-    return True
+    return has_course_indicator
 
 
 class BaseSourceScraper(ABC):

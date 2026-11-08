@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from urllib.parse import urljoin
-
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from scraper.models import CourseRecord
@@ -121,8 +120,25 @@ _EXCLUDED_SHARE_PATTERNS = (
     "linkedin.com",
     "mailto:",
     "javascript:",
+    "/register.php",
+    "guestlogin",
+    "/login",
+    "/member",
+    "/event/search",
+    "/product-category/",
+    "co_register_02.asp",
+    "/people-area/",
+    "callforpapers",
+    "/cdn-cgi/",
+    "blackhole=",
 )
 
+_PLAIN_URL_AFTER_REG_LABEL_REGEX = re.compile(
+    r"(?:報名網址|報名連結|報名方式|線上報名|網路報名|報名表單)\s*(?:[：:]|】\s*[：:]?)?\s*(https?://[^\s<>\"'）)]+)"
+)
+_CLOSED_REGISTRATION_REGEX = re.compile(
+    r"(?:報名已截止|報名截止|已截止報名|已額滿|名額已滿|停止報名|截止報名)"
+)
 _CREDIT_SENTENCE_KEYWORDS = ("積分", "學分", "繼續教育")
 _CREDIT_NEGATION_KEYWORDS = ("不申請", "無申請", "恕不提供", "不提供積分", "無繼續教育積分", "未申請", "不提供繼續教育")
 _OTHER_PROFESSION_KEYWORDS = (
@@ -342,6 +358,16 @@ def extract_registration_period(text: str) -> str:
 
     return ""
 
+def _unwrap_redirect_url(url: str) -> str:
+    """Unwrap Google AccountChooser continue=... and Facebook l.php?u=... URLs."""
+    if "accounts.google.com/AccountChooser" in url or "l.facebook.com/l.php" in url:
+        parsed = urlparse(url)
+        q = parse_qs(parsed.query)
+        target = (q.get("continue") or q.get("u") or [""])[0]
+        if target:
+            return unquote(target).split("?fbclid=")[0]
+    return url
+
 def _is_excluded_url(href: str) -> bool:
     lower_href = href.lower().strip()
     if not lower_href or lower_href.startswith("#"):
@@ -349,8 +375,19 @@ def _is_excluded_url(href: str) -> bool:
     return any(pattern in lower_href for pattern in _EXCLUDED_SHARE_PATTERNS)
 
 
+def is_registration_closed(title: str, text: str) -> bool:
+    """Return True if title or text explicitly marks the course registration as closed/full."""
+    if _CLOSED_REGISTRATION_REGEX.search(title or ""):
+        return True
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if stripped in ("報名截止", "已截止", "已額滿", "報名已截止", "名額已滿"):
+            return True
+    return False
+
+
 def extract_registration_url(html: str, detail_url: str) -> str:
-    """Find registration URL in HTML, resolving relative URLs and falling back to detail_url."""
+    """Find registration URL in HTML or plain text, falling back to detail_url."""
     if not html:
         return detail_url
 
@@ -362,7 +399,7 @@ def extract_registration_url(html: str, detail_url: str) -> str:
         if _is_excluded_url(raw_href):
             continue
 
-        resolved = urljoin(detail_url, raw_href)
+        resolved = _unwrap_redirect_url(urljoin(detail_url, raw_href))
         if _is_excluded_url(resolved):
             continue
 
@@ -376,24 +413,36 @@ def extract_registration_url(html: str, detail_url: str) -> str:
             candidates.append((100, resolved))
             continue
 
-        # Priority 2: Anchor text or surrounding label explicitly says 報名
-        if any(kw in anchor_text for kw in ("報名", "註冊", "register", "signup", "sign up")):
-            candidates.append((80, resolved))
+        # Priority 2: Explicit course registration action text
+        if any(kw in anchor_text for kw in ("點此報名", "線上報名", "立即報名", "我要報名", "報名表單", "前往報名")):
+            candidates.append((85, resolved))
             continue
 
-        if any(kw in context_text for kw in ("報名網址", "報名連結", "報名表單", "線上報名", "網路報名", "報名方式")):
-            candidates.append((70, resolved))
+        if any(kw in context_text for kw in ("報名網址", "報名連結", "報名表單", "線上報名", "網路報名")):
+            candidates.append((75, resolved))
             continue
 
-        if any(kw in lower_resolved for kw in ("register", "signup", "sign_up", "form", "enroll")):
-            candidates.append((50, resolved))
+        if any(kw in lower_resolved for kw in ("course-enroll", "/events/register/", "signup", "sign_up", "enroll")):
+            candidates.append((60, resolved))
 
     if candidates:
         candidates.sort(key=lambda item: item[0], reverse=True)
         return candidates[0][1]
 
-    return detail_url
+    # Fallback: plain-text URL written right after 報名網址： / 報名方式：
+    plain_text = soup.get_text("\n", strip=True)
+    plain_match = _PLAIN_URL_AFTER_REG_LABEL_REGEX.search(plain_text)
+    if plain_match:
+        candidate_url = _unwrap_redirect_url(plain_match.group(1).strip().rstrip("。，,；;"))
+        if not _is_excluded_url(candidate_url):
+            return candidate_url
 
+    for host in _KNOWN_FORM_HOSTS:
+        host_match = re.search(rf"https?://[^\s<>\"'）)]*{re.escape(host)}[^\s<>\"'）)]*", plain_text)
+        if host_match:
+            return _unwrap_redirect_url(host_match.group(0).rstrip("。，,；;"))
+
+    return detail_url
 
 def evaluate_clinical_credit(
     text: str,

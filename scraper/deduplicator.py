@@ -230,31 +230,17 @@ def _merge_two_records(first: CourseRecord, second: CourseRecord) -> CourseRecor
     else:
         course_date = detailed.course_date or secondary.course_date
 
-    def _is_fallback_time(val: str) -> bool:
-        return not val or val in ("詳見開課單位簡章", "詳見簡章")
-
+    is_fb_time = lambda v: not v or v in ("詳見開課單位簡章", "詳見簡章")
     course_time = (
         detailed.course_time
-        if not _is_fallback_time(detailed.course_time)
-        else (secondary.course_time if not _is_fallback_time(secondary.course_time) else (detailed.course_time or secondary.course_time))
+        if not is_fb_time(detailed.course_time)
+        else (secondary.course_time if not is_fb_time(secondary.course_time) else (detailed.course_time or secondary.course_time))
     )
     fee = detailed.fee or secondary.fee
 
-    def _is_fallback_loc(val: str) -> bool:
-        return not val or "依簡章公告" in val
-
-    if not _is_fallback_loc(detailed.location_mode) and not _is_fallback_loc(secondary.location_mode):
-        location_mode = (
-            detailed.location_mode
-            if len(detailed.location_mode) >= len(secondary.location_mode)
-            else secondary.location_mode
-        )
-    elif not _is_fallback_loc(detailed.location_mode):
-        location_mode = detailed.location_mode
-    elif not _is_fallback_loc(secondary.location_mode):
-        location_mode = secondary.location_mode
-    else:
-        location_mode = detailed.location_mode or secondary.location_mode
+    is_fb_loc = lambda v: not v or "依簡章公告" in v
+    loc_candidates = [v for v in (detailed.location_mode, secondary.location_mode) if not is_fb_loc(v)]
+    location_mode = max(loc_candidates, key=len) if loc_candidates else (detailed.location_mode or secondary.location_mode)
     registration_url = (
         detailed.registration_url
         if _url_priority(detailed.registration_url) >= _url_priority(secondary.registration_url)
@@ -329,5 +315,11 @@ def deduplicate_and_merge(
         else:
             merged_list.append(candidate)
 
-    merged_list.sort(key=_date_sort_key, reverse=True)
-    return merged_list
+    # shortcut: drop standalone whitelist rows without real announcement URLs and keep ROC year >= 115 (2026+)
+    active_list = [
+        r
+        for r in merged_list
+        if not _is_whitelist_only_record(r) and _date_sort_key(r)[0][0] >= 115
+    ]
+    active_list.sort(key=_date_sort_key, reverse=True)
+    return active_list

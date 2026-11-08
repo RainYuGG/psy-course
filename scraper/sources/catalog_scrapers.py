@@ -7,8 +7,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from scraper.extractor import extract_course_from_page, normalize_roc_date
-from scraper.http_client import HttpClient
+from scraper.extractor import extract_course_from_page, is_registration_closed, normalize_roc_date
 from scraper.models import CourseRecord
 from scraper.sources.base import (
     COURSE_INDICATOR_KEYWORDS,
@@ -134,6 +133,9 @@ class GenericCatalogScraper(BaseSourceScraper):
                 except Exception:
                     detail_html = ""
 
+                body_text = BeautifulSoup(detail_html or "", "lxml").get_text("\n", strip=True)
+                if is_registration_closed(title, body_text):
+                    continue
                 record = extract_course_from_page(
                     title=title,
                     html=detail_html or f"<html><body><h1>{title}</h1></body></html>",
@@ -143,7 +145,6 @@ class GenericCatalogScraper(BaseSourceScraper):
                     created_at=created_date,
                 )
                 records.append(record)
-
             # Fallback for single-page sites (e.g. Google Sites) where courses are inline blocks
             if not candidates:
                 records.extend(self._extract_inline_blocks(soup, list_url, created_date))
@@ -182,151 +183,32 @@ class GenericCatalogScraper(BaseSourceScraper):
         return inline_records
 
 
-# --- Batch 1 (Task 2.4): atpt, tcpu, twcpa, psychoanalysis, sop ---
+_CATALOG_SPECS: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
+    ("AtptScraper", "atpt", "台灣遊戲治療學會", "台灣遊戲治療學會", ("https://www.atpt.org.tw/course.php", "https://www.atpt.org.tw/")),
+    ("TcpuScraper", "tcpu", "中華民國諮商心理師公會全國聯合會", "中華民國諮商心理師公會全國聯合會", ("https://www.tcpu.org.tw/",)),
+    ("TwcpaScraper", "twcpa", "臺灣諮商心理學會", "臺灣諮商心理學會", ("https://www.twcpa.org.tw/recentcourses",)),
+    ("PsychoanalysisScraper", "psychoanalysis", "臺灣精神分析學會", "臺灣精神分析學會", ("https://psychoanalysis.org.tw/zh-Hant/event/list/6", "https://psychoanalysis.org.tw/")),
+    ("SopScraper", "sop", "台灣精神醫學會", "台灣精神醫學會", ("https://www.sop.org.tw/",)),
+    ("RmdarocScraper", "rmdaroc", "台灣心理復健協會", "台灣心理復健協會", ("https://sites.google.com/rmdaroc.org/signup/%E9%A6%96%E9%A0%81",)),
+    ("TapScraper", "tap", "臺灣心理治療學會", "臺灣心理治療學會", ("https://www.tap.org.tw/",)),
+    ("TposScraper", "tpos", "台灣心理腫瘤醫學學會", "台灣心理腫瘤醫學學會", ("http://www.tpos-society.org/",)),
+    ("IaptcScraper", "iaptc", "台灣網路成癮防治學會", "台灣網路成癮防治學會", ("https://iaptc.asia.edu.tw/",)),
+    ("TasctaiwanScraper", "tasctaiwan", "台灣性諮商學會", "台灣性諮商學會", ("https://tasctaiwan.tw/",)),
+    ("AcftEftScraper", "acft_eft", "華人伴侶與家族治療協會／亞太EFT", "華人伴侶與家族治療協會", ("http://www.acft.org.tw/", "https://asia-eft.com/")),
+    ("EcataScraper", "ecata", "台灣表創性藝術治療學會", "台灣表創性藝術治療學會", ("https://ecata.org.tw/",)),
+    ("MindfulnessScraper", "mindfulness", "台灣正念發展協會", "台灣正念發展協會", ("https://www.mindfulness.org.tw/",)),
+    ("TsosScraper", "tsos", "台灣自殺防治學會", "台灣自殺防治學會", ("https://www.tsos.org.tw/",)),
+)
 
-
-class AtptScraper(GenericCatalogScraper):
-    """台灣遊戲治療學會 (atpt.org.tw)."""
-
-    source_id = "atpt"
-    source_name = "台灣遊戲治療學會"
-    default_organizer = "台灣遊戲治療學會"
-    base_url = "https://www.atpt.org.tw/course.php"
-    listing_urls = ("https://www.atpt.org.tw/course.php", "https://www.atpt.org.tw/")
-
-class TcpuScraper(GenericCatalogScraper):
-    """中華民國諮商心理師公會全國聯合會 (tcpu.org.tw)."""
-
-    source_id = "tcpu"
-    source_name = "中華民國諮商心理師公會全國聯合會"
-    default_organizer = "中華民國諮商心理師公會全國聯合會"
-    base_url = "https://www.tcpu.org.tw/"
-    listing_urls = ("https://www.tcpu.org.tw/",)
-
-
-class TwcpaScraper(GenericCatalogScraper):
-    """臺灣諮商心理學會 (twcpa.org.tw/recentcourses)."""
-
-    source_id = "twcpa"
-    source_name = "臺灣諮商心理學會"
-    default_organizer = "臺灣諮商心理學會"
-    base_url = "https://www.twcpa.org.tw/recentcourses"
-    listing_urls = ("https://www.twcpa.org.tw/recentcourses",)
-
-
-class PsychoanalysisScraper(GenericCatalogScraper):
-    """臺灣精神分析學會 (psychoanalysis.org.tw)."""
-
-    source_id = "psychoanalysis"
-    source_name = "臺灣精神分析學會"
-    default_organizer = "臺灣精神分析學會"
-    base_url = "https://psychoanalysis.org.tw/zh-Hant/event/list/6"
-    listing_urls = (
-        "https://psychoanalysis.org.tw/zh-Hant/event/list/6",
-        "https://psychoanalysis.org.tw/",
+for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
+    globals()[_cls_name] = type(
+        _cls_name,
+        (GenericCatalogScraper,),
+        {
+            "source_id": _sid,
+            "source_name": _sname,
+            "default_organizer": _org,
+            "base_url": _urls[0],
+            "listing_urls": _urls,
+        },
     )
-
-class SopScraper(GenericCatalogScraper):
-    """台灣精神醫學會 (sop.org.tw)."""
-
-    source_id = "sop"
-    source_name = "台灣精神醫學會"
-    default_organizer = "台灣精神醫學會"
-    base_url = "https://www.sop.org.tw/"
-    listing_urls = ("https://www.sop.org.tw/",)
-
-
-# --- Batch 2 (Task 2.5): rmdaroc, tap, tpos, iaptc, tasctaiwan, acft_eft, ecata, mindfulness, tsos ---
-
-
-class RmdarocScraper(GenericCatalogScraper):
-    """台灣復健醫學會／心理復健相關報名頁 (sites.google.com/rmdaroc.org/signup/首頁)."""
-
-    source_id = "rmdaroc"
-    source_name = "台灣心理復健協會"
-    default_organizer = "台灣心理復健協會"
-    base_url = "https://sites.google.com/rmdaroc.org/signup/%E9%A6%96%E9%A0%81"
-    listing_urls = ("https://sites.google.com/rmdaroc.org/signup/%E9%A6%96%E9%A0%81",)
-
-
-class TapScraper(GenericCatalogScraper):
-    """臺灣心理治療學會 (tap.org.tw)."""
-
-    source_id = "tap"
-    source_name = "臺灣心理治療學會"
-    default_organizer = "臺灣心理治療學會"
-    base_url = "https://www.tap.org.tw/"
-    listing_urls = ("https://www.tap.org.tw/",)
-
-
-class TposScraper(GenericCatalogScraper):
-    """台灣心理腫瘤醫學學會 (tpos-society.org)."""
-
-    source_id = "tpos"
-    source_name = "台灣心理腫瘤醫學學會"
-    default_organizer = "台灣心理腫瘤醫學學會"
-    base_url = "http://www.tpos-society.org/"
-    listing_urls = ("http://www.tpos-society.org/",)
-
-
-class IaptcScraper(GenericCatalogScraper):
-    """台灣網路成癮防治學會 (iaptc.asia.edu.tw)."""
-
-    source_id = "iaptc"
-    source_name = "台灣網路成癮防治學會"
-    default_organizer = "台灣網路成癮防治學會"
-    base_url = "https://iaptc.asia.edu.tw/"
-    listing_urls = ("https://iaptc.asia.edu.tw/",)
-
-
-class TasctaiwanScraper(GenericCatalogScraper):
-    """台灣性諮商學會 (tasctaiwan.tw)."""
-
-    source_id = "tasctaiwan"
-    source_name = "台灣性諮商學會"
-    default_organizer = "台灣性諮商學會"
-    base_url = "https://tasctaiwan.tw/"
-    listing_urls = ("https://tasctaiwan.tw/",)
-
-
-class AcftEftScraper(GenericCatalogScraper):
-    """華人伴侶與家族治療協會 / 亞太情緒取向伴侶與家族治療協會 (acft.org.tw & asia-eft.com)."""
-
-    source_id = "acft_eft"
-    source_name = "華人伴侶與家族治療協會／亞太EFT"
-    default_organizer = "華人伴侶與家族治療協會"
-    base_url = "http://www.acft.org.tw/"
-    listing_urls = (
-        "http://www.acft.org.tw/",
-        "https://asia-eft.com/",
-    )
-
-
-class EcataScraper(GenericCatalogScraper):
-    """台灣表創性藝術治療學會 (ecata.org.tw)."""
-
-    source_id = "ecata"
-    source_name = "台灣表創性藝術治療學會"
-    default_organizer = "台灣表創性藝術治療學會"
-    base_url = "https://ecata.org.tw/"
-    listing_urls = ("https://ecata.org.tw/",)
-
-
-class MindfulnessScraper(GenericCatalogScraper):
-    """台灣正念發展協會 (mindfulness.org.tw)."""
-
-    source_id = "mindfulness"
-    source_name = "台灣正念發展協會"
-    default_organizer = "台灣正念發展協會"
-    base_url = "https://www.mindfulness.org.tw/"
-    listing_urls = ("https://www.mindfulness.org.tw/",)
-
-
-class TsosScraper(GenericCatalogScraper):
-    """台灣自殺防治學會 (tsos.org.tw)."""
-
-    source_id = "tsos"
-    source_name = "台灣自殺防治學會"
-    default_organizer = "台灣自殺防治學會"
-    base_url = "https://www.tsos.org.tw/"
-    listing_urls = ("https://www.tsos.org.tw/",)

@@ -7,11 +7,10 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from scraper.extractor import extract_course_from_page
+from scraper.extractor import extract_course_from_page, is_registration_closed
 from scraper.http_client import HttpClient
 from scraper.models import CourseRecord
 from scraper.sources.base import BaseSourceScraper, is_likely_course_title
-
 ATCP_TOPIC_URLS: tuple[str, ...] = (
     "https://www.atcp.org.tw/modules/news/index.php?storytopic=12",
     "https://www.atcp.org.tw/modules/news/index.php?storytopic=15",
@@ -20,7 +19,7 @@ ATCP_PLATFORM = "中華民國臨床心理師公會全國聯合會"
 
 
 def _extract_atcp_article_html(full_html: str) -> str:
-    """Extract the main article block after the 'NEWS' marker when present."""
+    """Extract the main article block and strip ATCP navigation/sidebar noise."""
     if not full_html:
         return ""
     soup = BeautifulSoup(full_html, "lxml")
@@ -28,14 +27,13 @@ def _extract_atcp_article_html(full_html: str) -> str:
     if article_body is not None:
         return str(article_body)
 
-    # Fallback: if there is a 'NEWS' marker node, take content after it
-    for node in soup.find_all(["div", "td", "h2", "h3", "span"]):
-        if node.get_text(strip=True) == "NEWS":
-            siblings_html = "".join(str(sib) for sib in node.find_next_siblings())
-            if siblings_html.strip():
-                return f"<div>{siblings_html}</div>"
-    return full_html
-
+    text_html = full_html
+    if "NEWS" in text_html:
+        text_html = text_html.split("NEWS", 1)[-1]
+    for marker in ("中華民國臨床心理師公會全國聯合會 15", "其他線上學習網站", "Design by"):
+        if marker in text_html:
+            text_html = text_html.split(marker, 1)[0]
+    return f"<div>{text_html}</div>"
 
 class AtcpScraper(BaseSourceScraper):
     """Scrapes ATCP storytopic=12 (轉知活動訊息) and storytopic=15 (研習活動公告)."""
@@ -75,6 +73,8 @@ class AtcpScraper(BaseSourceScraper):
                 try:
                     detail_html = client.get_text(detail_url)
                     body_html = _extract_atcp_article_html(detail_html)
+                    if is_registration_closed(title, BeautifulSoup(body_html, "lxml").get_text("\n", strip=True)):
+                        continue
                     record = extract_course_from_page(
                         title=title,
                         html=body_html,
@@ -87,7 +87,6 @@ class AtcpScraper(BaseSourceScraper):
                     count += 1
                 except Exception:
                     continue
-
                 if count >= self.max_items_per_topic:
                     break
 

@@ -53,10 +53,10 @@ body {
 
 .header-inner {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .site-title {
@@ -74,7 +74,8 @@ body {
 
 .header-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: 0.6rem;
 }
 
@@ -247,24 +248,25 @@ body {
   color: var(--text-primary);
   font-weight: 700;
   text-align: left;
-  padding: 0.65rem 0.5rem;
+  vertical-align: middle;
+  padding: 0.65rem 0.45rem;
   border-bottom: 2px solid var(--border-color);
   line-height: 1.3;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
 
-.courses-table thead th:nth-child(1) { width: 16.5%; } /* 課程名稱 */
-.courses-table thead th:nth-child(2) { width: 9%; }    /* 主辦單位 */
+.courses-table thead th:nth-child(1) { width: 15.5%; } /* 課程名稱 */
+.courses-table thead th:nth-child(2) { width: 8.5%; }  /* 主辦單位 */
 .courses-table thead th:nth-child(3) { width: 7.5%; }  /* 課程日期 */
-.courses-table thead th:nth-child(4) { width: 7%; }    /* 上課時間 */
+.courses-table thead th:nth-child(4) { width: 6.5%; }  /* 上課時間 */
 .courses-table thead th:nth-child(5) { width: 8.5%; }  /* 報名期間 */
 .courses-table thead th:nth-child(6) { width: 7.5%; }  /* 費用 */
-.courses-table thead th:nth-child(7) { width: 12%; }   /* 上課地點／方式 */
+.courses-table thead th:nth-child(7) { width: 11.5%; } /* 上課地點／方式 */
 .courses-table thead th:nth-child(8) { width: 7.5%; }  /* 報名連結 */
-.courses-table thead th:nth-child(9) { width: 6.5%; }  /* 是否有臨床心理師積分 */
-.courses-table thead th:nth-child(10) { width: 11%; }  /* 積分判斷依據段落 */
-.courses-table thead th:nth-child(11) { width: 7%; }   /* 資料來源平台 */
+.courses-table thead th:nth-child(9) { width: 8%; }    /* 是否有臨床心理師積分 */
+.courses-table thead th:nth-child(10) { width: 10.5%; } /* 積分判斷依據段落 */
+.courses-table thead th:nth-child(11) { width: 8.5%; } /* 資料來源平台 */
 
 .courses-table tbody td {
   padding: 0.6rem 0.5rem;
@@ -475,6 +477,16 @@ body {
     padding: 0 0.75rem;
   }
 
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
   .table-section {
     background-color: transparent;
     border: none;
@@ -492,17 +504,8 @@ body {
   }
 
   .courses-table thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+    display: none;
   }
-
   .courses-table tbody tr {
     display: block;
     background-color: var(--bg-surface);
