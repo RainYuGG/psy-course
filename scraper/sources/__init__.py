@@ -1,4 +1,4 @@
-"""Registry and runner for all 19 Taiwanese clinical/counseling psychology course scrapers."""
+"""Registry and runner for all 20 Taiwanese clinical/counseling psychology course scrapers."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from datetime import date
 
 from scraper.http_client import HttpClient
 from scraper.models import CourseRecord
+from scraper.sources.accupass import AccupassScraper
 from scraper.sources.atcp import AtcpScraper
 from scraper.sources.base import BaseSourceScraper
 from scraper.sources.catalog_scrapers import (
@@ -49,6 +50,7 @@ ALL_SCRAPERS: list[BaseSourceScraper] = [
     BeclassScraper(),
     TaipeiHealthScraper(),
     KaohsiungHealthScraper(),
+    AccupassScraper(),
 ]
 
 
@@ -76,6 +78,7 @@ def fetch_all_sources(
 
 __all__ = [
     "ALL_SCRAPERS",
+    "AccupassScraper",
     "AcftEftScraper",
     "AtptScraper",
     "BeclassScraper",

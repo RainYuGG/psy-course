@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import httpx
+import json
 import pytest
 
 from scraper.http_client import HttpClient
 from scraper.models import CourseRecord
 from scraper.sources import ALL_SCRAPERS, fetch_all_sources
 from scraper.sources.atcp import AtcpScraper
+from scraper.sources.accupass import AccupassScraper
 from scraper.sources.base import (
     COURSE_INDICATOR_KEYWORDS,
     NON_COURSE_KEYWORDS,
@@ -44,10 +46,12 @@ class FakeHttpClient:
     def __init__(
         self,
         responses: dict[str, str | Exception],
+        post_responses: dict[str, str | Exception] | None = None,
     ) -> None:
         self.responses = responses
+        self.post_responses = post_responses or {}
         self.requested_urls: list[str] = []
-
+        self.post_bodies: list[tuple[str, dict]] = []
     def get_text(self, url: str) -> str:
         self.requested_urls.append(url)
         if url not in self.responses:
@@ -57,6 +61,15 @@ class FakeHttpClient:
                 response=httpx.Response(404),
             )
         val = self.responses[url]
+        if isinstance(val, Exception):
+            raise val
+        return val
+
+    def post_json(self, url: str, payload: dict, headers: dict | None = None) -> str:
+        self.post_bodies.append((url, payload))
+        if url not in self.post_responses:
+            raise httpx.RequestError(f"no POST response configured for {url}")
+        val = self.post_responses[url]
         if isinstance(val, Exception):
             raise val
         return val
@@ -383,10 +396,59 @@ class TestAtcpArticleChrome:
         assert record.registration_url == "https://reurl.cc/zQrzla"
 
 
+class TestAccupassScraper:
+    """Tests for the AccuPass SearchEvents JSON API scraper."""
+
+    def test_accupass_searches_keywords_filters_and_builds_records(self) -> None:
+        api_payload = json.dumps(
+            {
+                "total": 3,
+                "items": [
+                    {
+                        "eventIdNumber": "111",
+                        "name": "115年度創傷知情臨床實務工作坊",
+                        "startDateTime": "2026-12-20T01:00:00Z",
+                        "eventPlaceType": "Offline",
+                    },
+                    {
+                        "eventIdNumber": "222",
+                        "name": "理監事會議紀錄",
+                        "startDateTime": "2026-12-20T01:00:00Z",
+                    },
+                    {
+                        "eventIdNumber": "333",
+                        "name": "110年度舊課程回顧講座",
+                        "startDateTime": "2020-01-01T01:00:00Z",
+                    },
+                ],
+            }
+        )
+        detail = (
+            "<html><body><h1>115年度創傷知情臨床實務工作坊</h1>"
+            "<p>上課時間：14:00-17:00</p><p>地點：線上</p>"
+            "<p>本課程申請臨床心理師繼續教育積分。</p></body></html>"
+        )
+        fake = FakeHttpClient(
+            responses={"https://www.accupass.com/event/111": detail},
+            post_responses={"https://api.accupass.com/v3/search/SearchEvents": api_payload},
+        )
+        scraper = AccupassScraper()
+        records = scraper.scrape(fake, created_at="2026-11-09")
+
+        assert len(records) == 1
+        assert records[0].course_name == "115年度創傷知情臨床實務工作坊"
+        assert records[0].course_time == "14:00–17:00"
+        assert records[0].has_clinical_credit == "是"
+        assert records[0].registration_url == "https://www.accupass.com/event/111"
+        assert len(fake.post_bodies) == 3
+        assert all(b[1]["keyword"] for b in fake.post_bodies)
+        assert "https://www.accupass.com/event/222" not in fake.requested_urls
+
+
 class TestCatalogScrapersAndFaultIsolation:
     """Tests for the 17 association/platform catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""
 
-    def test_all_19_scrapers_registered(self) -> None:
+    def test_all_20_scrapers_registered(self) -> None:
         scraper_ids = [s.source_id for s in ALL_SCRAPERS]
         expected_ids = [
             "taclip",
@@ -408,6 +470,7 @@ class TestCatalogScrapersAndFaultIsolation:
             "beclass",
             "taipei_health",
             "kaohsiung_health",
+            "accupass",
         ]
         assert scraper_ids == expected_ids
 

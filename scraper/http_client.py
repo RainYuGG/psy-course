@@ -89,3 +89,43 @@ class HttpClient:
     def get(self, url: str, **kwargs: Any) -> str:
         """Alias for get_text for convenience."""
         return self.get_text(url)
+
+    def post_json(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        headers: dict[str, str] | None = None,
+    ) -> str:
+        """POST a JSON body with the same retry and verify=False-on-SSL-error policy as get_text."""
+
+        def fetch(verify: bool) -> str:
+            last_exc: Exception | None = None
+            with httpx.Client(
+                timeout=self.timeout,
+                headers={**self.headers, **(headers or {})},
+                follow_redirects=True,
+                verify=verify,
+            ) as client:
+                for _ in range(self.retries + 1):
+                    try:
+                        response = client.post(url, json=payload)
+                        response.raise_for_status()
+                        return response.text
+                    except httpx.HTTPStatusError as exc:
+                        last_exc = exc
+                        if exc.response.status_code < 500:
+                            raise
+                    except httpx.RequestError as exc:
+                        last_exc = exc
+                        if verify and _is_ssl_error(exc):
+                            raise
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError(f"Failed to POST {url}")
+
+        try:
+            return fetch(verify=True)
+        except Exception as exc:
+            if _is_ssl_error(exc):
+                return fetch(verify=False)
+            raise
