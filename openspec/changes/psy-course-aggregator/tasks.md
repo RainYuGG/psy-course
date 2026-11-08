@@ -110,9 +110,9 @@
 
 ## Task 4: GitHub Pages Course Catalog Web GUI and Scheduled GitHub Actions Workflow
 
-- [ ] 4.1 實作 `docs/index.html`、`docs/style.css` 與 `docs/app.js` 響應式查詢介面（支援臨床積分是／未知／否、線上／實體、免費、月份、來源平台、關鍵字即時篩選）
-- [ ] 4.2 於網頁 GUI 實作「展開檢視積分判斷依據段落原文」、「一鍵下載 UTF-8 BOM CSV」及「複製 Google Sheets `=IMPORTDATA()` 同步公式與說明視窗」
-- [ ] 4.3 建立 `.github/workflows/update-courses.yml` 設定每日定時執行爬蟲、更新 `docs/data/` 並部署 GitHub Pages，並撰寫 `tests/test_ui_and_workflow.py`
+- [x] 4.1 實作 `docs/index.html`、`docs/style.css` 與 `docs/app.js` 響應式查詢介面（支援臨床積分是／未知／否、線上／實體、免費、月份、來源平台、關鍵字即時篩選）
+- [x] 4.2 於網頁 GUI 實作「展開檢視積分判斷依據段落原文」、「一鍵下載 UTF-8 BOM CSV」及「複製 Google Sheets `=IMPORTDATA()` 同步公式與說明視窗」
+- [x] 4.3 建立 `.github/workflows/update-courses.yml` 設定每日定時執行爬蟲、更新 `docs/data/` 並部署 GitHub Pages，並撰寫 `tests/test_ui_and_workflow.py`
 
 ### Task 4 Details & Interfaces
 

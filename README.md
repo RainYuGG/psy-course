@@ -1,0 +1,79 @@
+# 臨床心理師繼續教育課程彙整查詢平台 (`psy-course-aggregator`)
+
+自動從台灣臨床心理學會「審核通過課程總表」與 15 個心理治療／諮商／精神醫學相關學會與公會官網抓取研習課程公告，透過純規則引擎（HTML DOM + 台灣公文／簡章正規表示式，**零付費 LLM API Key**）抽取 12 個標準欄位、跨站去重並互補合併，產出：
+
+1. **GitHub Pages 響應式網頁查詢介面**（`docs/index.html`、`docs/style.css`、`docs/app.js`）
+2. **UTF-8 with BOM 編碼之 CSV 檔案**（`docs/data/courses.csv`），支援 Excel 直接開啟不亂碼
+3. **Google Sheets 免金鑰 `=IMPORTDATA()` 自動同步**
+
+---
+
+## 12 個標準輸出欄位（CSV 與 JSON 嚴格依序）
+
+1. `課程名稱`
+2. `主辦單位`
+3. `課程日期`（民國年斜線格式 `YYY/MM/DD`，如 `115/06/25` 或跨日 `115/09/12–115/09/13`）
+4. `上課時間`（如 `13:30–16:30`，未載明則留空）
+5. `費用`（如 `免費`、`$800`，未載明則留空）
+6. `上課地點／方式`（如 `線上`、`實體` 或具體場地名稱）
+7. `報名連結`（優先取外部報名表單網址，否則回退至該公告明細頁網址）
+8. `是否有臨床心理師積分`（嚴格為 `是`、`否`、`未知` 三擇一）
+9. `積分判斷依據段落`（學會審核通過認證字號 `TACP...` 或公告內文提及繼續教育積分之原句）
+10. `資料來源平台`（各公學會或審核通過課程總表名稱）
+11. `建立時間`（資料抓取日期 `YYYY-MM-DD`）
+12. `報名期間`（公告載明之報名起迄期間，未載明則留空）
+
+---
+
+## 本地端安裝與執行方式
+
+### 1. 建立虛擬環境並安裝相依套件
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+### 2. 執行爬蟲更新 `docs/data/courses.csv` 與 `docs/data/courses.json`
+
+```bash
+python -m scraper.cli --output-dir docs/data
+```
+
+若在無外網環境測試管道，可使用離線種子模式：
+
+```bash
+python -m scraper.cli --output-dir docs/data --offline-seed
+```
+
+### 3. 本地預覽網頁查詢 GUI
+
+```bash
+python3 -m http.server 8000 --directory docs
+```
+
+接著於瀏覽器開啟 `http://localhost:8000` 即可使用關鍵字、臨床心理師積分（是／未知／否）、上課方式（線上／實體）、費用（免費／付費）、課程月份與資料來源平台進行即時篩選。
+
+### 4. 執行自動化測試
+
+```bash
+.venv/bin/pytest -v
+```
+
+---
+
+## Google Sheets 免金鑰自動同步指南
+
+當本專案部署至 GitHub Pages 後，`docs/data/courses.csv` 會公開於：
+
+```text
+https://<您的GitHub帳號>.github.io/<Repo名稱>/data/courses.csv
+```
+
+在 Google Sheets 任一空白工作表的 `A1` 儲存格輸入以下公式：
+
+```excel
+=IMPORTDATA("https://<您的GitHub帳號>.github.io/<Repo名稱>/data/courses.csv")
+```
+
+也可直接點擊網頁右上角的 **「📊 Google Sheets 自動同步公式」** 按鈕一鍵複製完整公式。
