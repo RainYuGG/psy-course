@@ -20,9 +20,9 @@
 
 ## Task 1: Project Foundation, 12-Field Course Model, and Rule-Based Extractor
 
-- [ ] 1.1 建立 Python 套件與目錄結構（`scraper/__init__.py`、`docs/data/`、`tests/`、`requirements.txt`、`pyproject.toml`）
-- [ ] 1.2 實作 `scraper/models.py` 定義 12 個指定欄位的 `CourseRecord` dataclass、欄位順序常數 `COURSE_FIELD_NAMES` 與 `to_dict()` / `to_csv_row()` 方法
-- [ ] 1.3 實作 `scraper/extractor.py` 純規則抽取引擎與 `tests/test_extractor.py` 單元測試
+- [x] 1.1 建立 Python 套件與目錄結構（`scraper/__init__.py`、`docs/data/`、`tests/`、`requirements.txt`、`pyproject.toml`）
+- [x] 1.2 實作 `scraper/models.py` 定義 12 個指定欄位的 `CourseRecord` dataclass、欄位順序常數 `COURSE_FIELD_NAMES` 與 `to_dict()` / `to_csv_row()` 方法
+- [x] 1.3 實作 `scraper/extractor.py` 純規則抽取引擎與 `tests/test_extractor.py` 單元測試
 
 ### Task 1 Details & Interfaces
 
@@ -56,11 +56,11 @@
 
 ## Task 2: HTTP Client, TACLIP Credit Whitelist, and 15 A-Class Source Scrapers
 
-- [ ] 2.1 實作 `scraper/http_client.py` 共用 HTTP 抓取工具（含 Timeout、Retry、User-Agent 與特定站點 SSL 驗證容錯）與 `scraper/sources/base.py` `BaseSourceScraper` 介面
-- [ ] 2.2 實作 `scraper/sources/taclip_whitelist.py` 抓取台灣臨床心理學會 `taclip.org.tw/checked-list/` 審核通過課程總表與最新消息
-- [ ] 2.3 實作臨床心理師公會全聯會爬蟲 `scraper/sources/atcp.py`（抓取 `storytopic=12` 轉知活動訊息與 `storytopic=15` 研習活動公告並過濾非課程訊息）
-- [ ] 2.4 實作第一批學會爬蟲（`atpt` 遊戲治療、`tcpu` 諮商全聯會、`twcpa` 諮商學會、`psychoanalysis` 精神分析學會、`sop` 精神醫學會）
-- [ ] 2.5 實作第二批學會爬蟲（`rmdaroc` 復健醫學、`tap` 心理治療、`tpos` 心理腫瘤、`iaptc` 網路成癮、`tasctaiwan` 性諮商、`acft_eft` 伴侶家族、`ecata` 表創藝術、`mindfulness` 正念、`tsos` 自殺防治）與 `tests/test_sources.py`
+- [x] 2.1 實作 `scraper/http_client.py` 共用 HTTP 抓取工具（含 Timeout、Retry、User-Agent 與特定站點 SSL 驗證容錯）與 `scraper/sources/base.py` `BaseSourceScraper` 介面
+- [x] 2.2 實作 `scraper/sources/taclip_whitelist.py` 抓取台灣臨床心理學會 `taclip.org.tw/checked-list/` 審核通過課程總表與最新消息
+- [x] 2.3 實作臨床心理師公會全聯會爬蟲 `scraper/sources/atcp.py`（抓取 `storytopic=12` 轉知活動訊息與 `storytopic=15` 研習活動公告並過濾非課程訊息）
+- [x] 2.4 實作第一批學會爬蟲（`atpt` 遊戲治療、`tcpu` 諮商全聯會、`twcpa` 諮商學會、`psychoanalysis` 精神分析學會、`sop` 精神醫學會）
+- [x] 2.5 實作第二批學會爬蟲（`rmdaroc` 復健醫學、`tap` 心理治療、`tpos` 心理腫瘤、`iaptc` 網路成癮、`tasctaiwan` 性諮商、`acft_eft` 伴侶家族、`ecata` 表創藝術、`mindfulness` 正念、`tsos` 自殺防治）與 `tests/test_sources.py`
 
 ### Task 2 Details & Interfaces
 
@@ -86,9 +86,9 @@
 
 ## Task 3: Cross-Source Deduplicator, CSV/JSON Exporter, and CLI Runner
 
-- [ ] 3.1 實作 `scraper/deduplicator.py` 依正規化課程名稱與民國日期去重，並將 `taclip` 審核通過紀錄與各學會詳細公告互補合併
-- [ ] 3.2 實作 `scraper/exporter.py` 產出 `docs/data/courses.json` 與 `docs/data/courses.csv`（UTF-8 with BOM 嚴格 12 欄位）
-- [ ] 3.3 實作 `scraper/cli.py` CLI 入口支援一鍵執行全站抓取、本地測試與產出檔案驗證，並撰寫 `tests/test_pipeline.py`
+- [x] 3.1 實作 `scraper/deduplicator.py` 依正規化課程名稱與民國日期去重，並將 `taclip` 審核通過紀錄與各學會詳細公告互補合併
+- [x] 3.2 實作 `scraper/exporter.py` 產出 `docs/data/courses.json` 與 `docs/data/courses.csv`（UTF-8 with BOM 嚴格 12 欄位）
+- [x] 3.3 實作 `scraper/cli.py` CLI 入口支援一鍵執行全站抓取、本地測試與產出檔案驗證，並撰寫 `tests/test_pipeline.py`
 
 ### Task 3 Details & Interfaces
 
@@ -110,9 +110,9 @@
 
 ## Task 4: GitHub Pages Course Catalog Web GUI and Scheduled GitHub Actions Workflow
 
-- [ ] 4.1 實作 `docs/index.html`、`docs/style.css` 與 `docs/app.js` 響應式查詢介面（支援臨床積分是／未知／否、線上／實體、免費、月份、來源平台、關鍵字即時篩選）
-- [ ] 4.2 於網頁 GUI 實作「展開檢視積分判斷依據段落原文」、「一鍵下載 UTF-8 BOM CSV」及「複製 Google Sheets `=IMPORTDATA()` 同步公式與說明視窗」
-- [ ] 4.3 建立 `.github/workflows/update-courses.yml` 設定每日定時執行爬蟲、更新 `docs/data/` 並部署 GitHub Pages，並撰寫 `tests/test_ui_and_workflow.py`
+- [x] 4.1 實作 `docs/index.html`、`docs/style.css` 與 `docs/app.js` 響應式查詢介面（支援臨床積分是／未知／否、線上／實體、免費、月份、來源平台、關鍵字即時篩選）
+- [x] 4.2 於網頁 GUI 實作「展開檢視積分判斷依據段落原文」、「一鍵下載 UTF-8 BOM CSV」及「複製 Google Sheets `=IMPORTDATA()` 同步公式與說明視窗」
+- [x] 4.3 建立 `.github/workflows/update-courses.yml` 設定每日定時執行爬蟲、更新 `docs/data/` 並部署 GitHub Pages，並撰寫 `tests/test_ui_and_workflow.py`
 
 ### Task 4 Details & Interfaces
 

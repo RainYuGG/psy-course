@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>臨床心理師繼續教育課程彙整查詢平台</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div>
+        <h1 class="site-title">臨床心理師繼續教育課程彙整查詢平台</h1>
+        <p class="site-subtitle">
+          自動彙整台灣臨床心理學會審核通過課程總表與 15 個心理相關學會／公會研習公告（純規則抽取・每日自動更新）
+        </p>
+      </div>
+      <div class="header-actions">
+        <a
+          id="btn-download-csv"
+          class="btn btn-primary"
+          href="./data/courses.csv"
+          download="courses.csv"
+        >
+          ⬇ 下載完整 CSV (UTF-8 BOM)
+        </a>
+        <button id="btn-export-filtered-csv" type="button" class="btn btn-secondary">
+          ⬇ 匯出目前篩選結果 CSV
+        </button>
+        <button id="btn-sheets-sync" type="button" class="btn btn-accent">
+          📊 Google Sheets 自動同步公式
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <section class="filters-panel" aria-label="課程篩選條件">
+      <div class="filters-grid">
+        <div class="filter-group filter-group-keyword">
+          <label for="filter-keyword">關鍵字搜尋</label>
+          <input
+            type="search"
+            id="filter-keyword"
+            placeholder="搜尋課程名稱、主辦單位、地點、認證字號或積分依據..."
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-credit">是否有臨床心理師積分</label>
+          <select id="filter-credit">
+            <option value="">全部</option>
+            <option value="是">是（含學會審核通過／公告載明）</option>
+            <option value="未知">未知（待確認／未載明）</option>
+            <option value="否">否（不申請／僅他類醫事積分）</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-mode">上課地點／方式</label>
+          <select id="filter-mode">
+            <option value="">全部</option>
+            <option value="線上">線上（視訊／Zoom／Meet）</option>
+            <option value="實體">實體（含混合制）</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-fee">費用</label>
+          <select id="filter-fee">
+            <option value="">全部</option>
+            <option value="免費">免費</option>
+            <option value="付費">付費</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-month">課程月份（民國年/月）</label>
+          <select id="filter-month">
+            <option value="">全部月份</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-source">資料來源平台</label>
+          <select id="filter-source">
+            <option value="">全部來源平台</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-metrics">
+          <span id="course-count" class="metric-badge">共 0 筆課程</span>
+          <span id="last-updated" class="metric-text">最後更新：載入中...</span>
+          <span id="source-status-summary" class="metric-text">來源狀態：載入中...</span>
+        </div>
+        <button id="btn-reset-filters" type="button" class="btn btn-ghost">
+          重設篩選條件
+        </button>
+      </div>
+    </section>
+
+    <section class="table-section" aria-label="課程列表">
+      <div class="table-responsive">
+        <table id="courses-table" class="courses-table">
+          <thead>
+            <tr>
+              <th scope="col">課程名稱</th>
+              <th scope="col">主辦單位</th>
+              <th scope="col">課程日期</th>
+              <th scope="col">上課時間</th>
+              <th scope="col">費用</th>
+              <th scope="col">上課地點／方式</th>
+              <th scope="col">報名連結</th>
+              <th scope="col">是否有臨床心理師積分</th>
+              <th scope="col">積分判斷依據段落</th>
+              <th scope="col">資料來源平台</th>
+              <th scope="col">建立時間</th>
+              <th scope="col">報名期間</th>
+            </tr>
+          </thead>
+          <tbody id="courses-tbody">
+            <tr>
+              <td colspan="12" class="loading-cell">正在載入課程資料...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div
+    id="sheets-modal"
+    class="modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sheets-modal-title"
+    hidden
+  >
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 id="sheets-modal-title">Google Sheets 免金鑰自動同步設定</h2>
+        <button id="btn-close-modal" type="button" class="modal-close" aria-label="關閉視窗">
+          ✕
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>
+          本平台產出之 <code>data/courses.csv</code> 採用標準 12 欄位 UTF-8 with BOM 編碼，
+          您只需在 Google 試算表貼上下列公式，即可自動同步最新課程表格（無需任何付費 API Key）：
+        </p>
+        <div class="formula-box">
+          <input
+            type="text"
+            id="sheets-formula-input"
+            readonly
+            value='=IMPORTDATA("./data/courses.csv")'
+            aria-label="Google Sheets IMPORTDATA 公式"
+          />
+          <button id="btn-copy-formula" type="button" class="btn btn-primary">
+            複製公式
+          </button>
+        </div>
+        <p id="copy-feedback" class="copy-feedback" aria-live="polite"></p>
+        <ol class="sheets-steps">
+          <li>開啟一份新的或現有的 <strong>Google 試算表 (Google Sheets)</strong>。</li>
+          <li>點選左上角第一個儲存格 <code>A1</code>。</li>
+          <li>貼上上方複製的 <code>=IMPORTDATA("...")</code> 公式並按 Enter。</li>
+          <li>Google Sheets 將自動抓取並展開全部 12 個欄位，且隨本網站每日排程更新而同步刷新。</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>
+        資料來源涵蓋：台灣臨床心理學會、中華民國臨床心理師公會全聯會、台灣遊戲治療學會、諮商心理師公會全聯會、臺灣諮商心理學會、臺灣精神分析學會、台灣精神醫學會、台灣復健醫學會、臺灣心理治療學會、台灣心理腫瘤醫學學會、台灣網路成癮防治學會、台灣性諮商學會、華人伴侶與家族治療協會／亞太EFT、台灣表創性藝術治療學會、台灣正念發展協會、台灣自殺防治學會。實際積分與報名資訊請以各主辦單位最新正式簡章為準。
+      </p>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
