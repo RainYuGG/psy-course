@@ -1,6 +1,13 @@
 name: Update Continuing Education Courses & Deploy Pages
 
 on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/update-courses.yml"
   schedule:
     # Runs daily at 22:00 UTC (06:00 Taiwan time UTC+8)
     - cron: "0 22 * * *"
@@ -26,18 +33,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python 3.11
+        if: github.event_name != 'push'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
       - name: Install dependencies
+        if: github.event_name != 'push'
         run: pip install -r requirements.txt
 
       - name: Run course scraper pipeline
+        if: github.event_name != 'push'
         run: python -m scraper.cli --output-dir docs/data
 
       - name: Commit and push updated course data if changed
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
