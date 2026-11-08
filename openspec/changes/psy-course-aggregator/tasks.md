@@ -86,9 +86,9 @@
 
 ## Task 3: Cross-Source Deduplicator, CSV/JSON Exporter, and CLI Runner
 
-- [ ] 3.1 實作 `scraper/deduplicator.py` 依正規化課程名稱與民國日期去重，並將 `taclip` 審核通過紀錄與各學會詳細公告互補合併
-- [ ] 3.2 實作 `scraper/exporter.py` 產出 `docs/data/courses.json` 與 `docs/data/courses.csv`（UTF-8 with BOM 嚴格 12 欄位）
-- [ ] 3.3 實作 `scraper/cli.py` CLI 入口支援一鍵執行全站抓取、本地測試與產出檔案驗證，並撰寫 `tests/test_pipeline.py`
+- [x] 3.1 實作 `scraper/deduplicator.py` 依正規化課程名稱與民國日期去重，並將 `taclip` 審核通過紀錄與各學會詳細公告互補合併
+- [x] 3.2 實作 `scraper/exporter.py` 產出 `docs/data/courses.json` 與 `docs/data/courses.csv`（UTF-8 with BOM 嚴格 12 欄位）
+- [x] 3.3 實作 `scraper/cli.py` CLI 入口支援一鍵執行全站抓取、本地測試與產出檔案驗證，並撰寫 `tests/test_pipeline.py`
 
 ### Task 3 Details & Interfaces
 
