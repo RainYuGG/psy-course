@@ -1,4 +1,4 @@
-"""Registry and runner for all 16 Taiwanese clinical/counseling psychology course scrapers."""
+"""Registry and runner for all 19 Taiwanese clinical/counseling psychology course scrapers."""
 
 from __future__ import annotations
 
@@ -11,14 +11,17 @@ from scraper.sources.base import BaseSourceScraper
 from scraper.sources.catalog_scrapers import (
     AcftEftScraper,
     AtptScraper,
+    BeclassScraper,
     EcataScraper,
     IaptcScraper,
+    KaohsiungHealthScraper,
     MindfulnessScraper,
     PsychoanalysisScraper,
     RmdarocScraper,
     SopScraper,
     TapScraper,
     TasctaiwanScraper,
+    TaipeiHealthScraper,
     TcpuScraper,
     TposScraper,
     TsosScraper,
@@ -43,6 +46,9 @@ ALL_SCRAPERS: list[BaseSourceScraper] = [
     EcataScraper(),
     MindfulnessScraper(),
     TsosScraper(),
+    BeclassScraper(),
+    TaipeiHealthScraper(),
+    KaohsiungHealthScraper(),
 ]
 
 
@@ -71,11 +77,12 @@ def fetch_all_sources(
 __all__ = [
     "ALL_SCRAPERS",
     "AcftEftScraper",
-    "AtcpScraper",
     "AtptScraper",
+    "BeclassScraper",
     "BaseSourceScraper",
     "EcataScraper",
     "IaptcScraper",
+    "KaohsiungHealthScraper",
     "MindfulnessScraper",
     "PsychoanalysisScraper",
     "RmdarocScraper",
@@ -83,6 +90,7 @@ __all__ = [
     "TaclipWhitelistScraper",
     "TapScraper",
     "TasctaiwanScraper",
+    "TaipeiHealthScraper",
     "TcpuScraper",
     "TposScraper",
     "TsosScraper",

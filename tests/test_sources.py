@@ -121,6 +121,8 @@ class TestCourseTitleFiltering:
             ("本會端午節連續假期休假公告", False),
             ("組織架構", False),
             ("申訴說明", False),
+            ("課程/講座", False),
+            ("高雄市政府衛生局長期照顧管理中心約聘照顧管理督導甄選結果", False),
             ("-已額滿-2026台灣遊戲治療學會年會專業工作坊", False),
             ("115年度臨床心理師繼續教育課程：創傷知情實務工作坊", True),
             ("【轉知】2026年自殺防治守門人教育訓練研習會", True),
@@ -382,9 +384,9 @@ class TestAtcpArticleChrome:
 
 
 class TestCatalogScrapersAndFaultIsolation:
-    """Tests for the 14 association catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""
+    """Tests for the 17 association/platform catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""
 
-    def test_all_16_scrapers_registered(self) -> None:
+    def test_all_19_scrapers_registered(self) -> None:
         scraper_ids = [s.source_id for s in ALL_SCRAPERS]
         expected_ids = [
             "taclip",
@@ -403,6 +405,9 @@ class TestCatalogScrapersAndFaultIsolation:
             "ecata",
             "mindfulness",
             "tsos",
+            "beclass",
+            "taipei_health",
+            "kaohsiung_health",
         ]
         assert scraper_ids == expected_ids
 

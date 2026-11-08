@@ -1,4 +1,4 @@
-"""Catalog scrapers for the remaining 14 A-class Taiwanese psychology associations."""
+"""Catalog scrapers for A-class Taiwanese psychology associations, an event platform, and city health bureaus."""
 
 from __future__ import annotations
 
@@ -198,6 +198,9 @@ _CATALOG_SPECS: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
     ("EcataScraper", "ecata", "台灣表創性藝術治療學會", "台灣表創性藝術治療學會", ("https://ecata.org.tw/",)),
     ("MindfulnessScraper", "mindfulness", "台灣正念發展協會", "台灣正念發展協會", ("https://www.mindfulness.org.tw/",)),
     ("TsosScraper", "tsos", "台灣自殺防治學會", "台灣自殺防治學會", ("https://www.tsos.org.tw/",)),
+    ("BeclassScraper", "beclass", "Beclass 活動平台", "Beclass 活動平台", ("https://www.beclass.com/default.php?name=ShowList&op=catRank&range=T",)),
+    ("TaipeiHealthScraper", "taipei_health", "臺北市政府衛生局", "臺北市政府衛生局", ("https://health.gov.taipei/", "https://health.gov.taipei/News.aspx?n=4E598A19194EA548")),
+    ("KaohsiungHealthScraper", "kaohsiung_health", "高雄市政府衛生局", "高雄市政府衛生局", ("https://health.kcg.gov.tw/", "https://health.kcg.gov.tw/News.aspx?n=51623F92649C1BE2")),
 )
 
 for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
