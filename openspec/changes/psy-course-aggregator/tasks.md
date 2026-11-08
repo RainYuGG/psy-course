@@ -56,11 +56,11 @@
 
 ## Task 2: HTTP Client, TACLIP Credit Whitelist, and 15 A-Class Source Scrapers
 
-- [ ] 2.1 實作 `scraper/http_client.py` 共用 HTTP 抓取工具（含 Timeout、Retry、User-Agent 與特定站點 SSL 驗證容錯）與 `scraper/sources/base.py` `BaseSourceScraper` 介面
-- [ ] 2.2 實作 `scraper/sources/taclip_whitelist.py` 抓取台灣臨床心理學會 `taclip.org.tw/checked-list/` 審核通過課程總表與最新消息
-- [ ] 2.3 實作臨床心理師公會全聯會爬蟲 `scraper/sources/atcp.py`（抓取 `storytopic=12` 轉知活動訊息與 `storytopic=15` 研習活動公告並過濾非課程訊息）
-- [ ] 2.4 實作第一批學會爬蟲（`atpt` 遊戲治療、`tcpu` 諮商全聯會、`twcpa` 諮商學會、`psychoanalysis` 精神分析學會、`sop` 精神醫學會）
-- [ ] 2.5 實作第二批學會爬蟲（`rmdaroc` 復健醫學、`tap` 心理治療、`tpos` 心理腫瘤、`iaptc` 網路成癮、`tasctaiwan` 性諮商、`acft_eft` 伴侶家族、`ecata` 表創藝術、`mindfulness` 正念、`tsos` 自殺防治）與 `tests/test_sources.py`
+- [x] 2.1 實作 `scraper/http_client.py` 共用 HTTP 抓取工具（含 Timeout、Retry、User-Agent 與特定站點 SSL 驗證容錯）與 `scraper/sources/base.py` `BaseSourceScraper` 介面
+- [x] 2.2 實作 `scraper/sources/taclip_whitelist.py` 抓取台灣臨床心理學會 `taclip.org.tw/checked-list/` 審核通過課程總表與最新消息
+- [x] 2.3 實作臨床心理師公會全聯會爬蟲 `scraper/sources/atcp.py`（抓取 `storytopic=12` 轉知活動訊息與 `storytopic=15` 研習活動公告並過濾非課程訊息）
+- [x] 2.4 實作第一批學會爬蟲（`atpt` 遊戲治療、`tcpu` 諮商全聯會、`twcpa` 諮商學會、`psychoanalysis` 精神分析學會、`sop` 精神醫學會）
+- [x] 2.5 實作第二批學會爬蟲（`rmdaroc` 復健醫學、`tap` 心理治療、`tpos` 心理腫瘤、`iaptc` 網路成癮、`tasctaiwan` 性諮商、`acft_eft` 伴侶家族、`ecata` 表創藝術、`mindfulness` 正念、`tsos` 自殺防治）與 `tests/test_sources.py`
 
 ### Task 2 Details & Interfaces
 
