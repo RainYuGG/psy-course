@@ -198,6 +198,9 @@ class TestStyleCssAndAppJs:
 
         const csvText = app.coursesToCsvWithBom(courses);
         assert.ok(csvText.startsWith('\\uFEFF課程名稱,主辦單位,課程日期'));
+
+        assert.strictEqual(app.daysSinceUpdated(''), 0);
+        assert.ok(app.daysSinceUpdated('2020-01-01 00:00:00') > 1000);
         """
         proc = subprocess.run(
             ["node", "-e", script],

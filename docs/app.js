@@ -132,6 +132,15 @@
     }
   }
 
+  function daysSinceUpdated(updatedAt) {
+    // updated_at is UTC (GitHub Actions runner); parse as such so staleness does not depend on viewer timezone
+    const parsed = Date.parse(String(updatedAt || "").replace(" ", "T") + "Z");
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+    return Math.max(0, Math.floor((Date.now() - parsed) / 86400000));
+  }
+
   function escapeCsvCell(value) {
     const str = value == null ? "" : String(value);
     if (/[",\r\n]/.test(str)) {
@@ -433,7 +442,10 @@
       .then(function (payload) {
         allCourses = Array.isArray(payload.courses) ? payload.courses : [];
         if (updatedEl) {
-          updatedEl.textContent = "最後更新：" + (payload.updated_at || "未知");
+          const days = daysSinceUpdated(payload.updated_at);
+          updatedEl.textContent =
+            "最後更新：" + (payload.updated_at || "未知") +
+            (days >= 2 ? "（資料已 " + days + " 天未更新，自動更新可能失敗）" : "");
         }
         if (sourceSummaryEl && Array.isArray(payload.source_statuses)) {
           const okCount = payload.source_statuses.filter(function (s) {
@@ -470,5 +482,6 @@
     filterCourses: filterCourses,
     buildImportDataFormula: buildImportDataFormula,
     coursesToCsvWithBom: coursesToCsvWithBom,
+    daysSinceUpdated: daysSinceUpdated,
   };
 });
