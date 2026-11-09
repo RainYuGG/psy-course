@@ -459,6 +459,40 @@ class TestAccupassScraper:
         assert all(b[1]["keyword"] for b in fake.post_bodies)
         assert "https://api.accupass.com/v3/events/222" not in fake.requested_urls
 
+    def test_accupass_zero_price_with_free_tag_marks_fee_free(self) -> None:
+        api_payload = json.dumps(
+            {
+                "total": 1,
+                "items": [
+                    {
+                        "eventIdNumber": "444",
+                        "name": "115年度免費公開講座",
+                        "startDateTime": "2026-12-20T01:00:00Z",
+                    },
+                ],
+            }
+        )
+        detail = json.dumps(
+            {
+                "eventIdNumber": "444",
+                "isFree": False,
+                "eventPlaceType": "Online",
+                "eventTimeObj": {
+                    "startDateTime": "2026-12-20T14:00:00",
+                    "endDateTime": "2026-12-20T15:00:00",
+                },
+                "registerBtn": {"isDisabled": False, "price": 0, "currency": "NT$"},
+                "tags": [{"name": "免費"}],
+            }
+        )
+        fake = FakeHttpClient(
+            responses={"https://api.accupass.com/v3/events/444": detail},
+            post_responses={"https://api.accupass.com/v3/search/SearchEvents": api_payload},
+        )
+        records = AccupassScraper().scrape(fake, created_at="2026-11-09")
+        assert len(records) == 1
+        assert records[0].fee == "免費"
+
 
 class TestCatalogScrapersAndFaultIsolation:
     """Tests for the 17 association/platform catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""

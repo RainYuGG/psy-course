@@ -73,6 +73,8 @@ def _detail_fields(detail: dict) -> dict:
         currency = str(register_btn.get("currency") or "")
         if price_num > 0:
             fee = f"{currency}{price_num:g}"
+        elif any("免費" in str(tag.get("name") or "") for tag in detail.get("tags") or []):
+            fee = "免費"
 
     mode = {"Online": "線上", "Offline": "實體"}.get(str(detail.get("eventPlaceType") or ""), "")
     organizer = str((detail.get("organizer") or {}).get("title") or "").strip()

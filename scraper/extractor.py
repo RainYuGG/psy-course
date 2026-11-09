@@ -45,6 +45,7 @@ _REGISTRATION_LINE_KEYWORDS = (
 _TIME_RANGE_REGEX = re.compile(
     r"(?<!\d)([0-2]?\d[:：][0-5]\d)\s*[~～\-–—至到]\s*([0-2]?\d[:：][0-5]\d)(?!\d)"
 )
+_TIME_LABEL_REGEX = re.compile(r"(?:課程時間|上課時間)\s*[：:]")
 _CHINESE_TIME_RANGE_REGEX = re.compile(
     r"(?<!\d)([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?\s*[~～\-–—至到]\s*([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?"
 )
@@ -279,6 +280,10 @@ def extract_time_range(text: str) -> str:
 
     filtered = _strip_office_hour_lines(text)
 
+    start_end = re.search(r"(\d{1,2}[:：]\d{2})\s*起[\s\S]{0,80}?(\d{1,2}[:：]\d{2})\s*止", filtered)
+    if start_end:
+        return f"{_pad_hhmm(start_end.group(1))}–{_pad_hhmm(start_end.group(2))}"
+
     match = _TIME_RANGE_REGEX.search(filtered)
     if match:
         start_t = _pad_hhmm(match.group(1))
@@ -356,7 +361,12 @@ def extract_fee(text: str) -> str:
         match = _FEE_LABEL_REGEX.search(line)
         if not match:
             continue
-        for candidate in [line[match.end():], *lines[i + 1 : i + 5]]:
+        window: list[str] = []
+        for j in range(i + 1, min(i + 16, len(lines))):
+            if _FEE_LABEL_REGEX.search(lines[j]) or _TIME_LABEL_REGEX.search(lines[j]):
+                break  # next section: stop looking
+            window.append(lines[j])
+        for candidate in [line[match.end():], *window]:
             candidate = re.split(r"[。；;]", candidate)[0].strip().rstrip("，, ")
             if candidate and _FEE_VALUE_REGEX.search(candidate):
                 return _normalize_fee(candidate)
@@ -630,8 +640,20 @@ def extract_course_from_page(
             clean_title = short_match.group(1).strip()
 
     organizer = _extract_organizer(clean_title, text, default_organizer, source_platform)
-    course_date = normalize_roc_date(text) or normalize_roc_date(clean_title)
-    course_time = extract_time_range(text) or extract_time_range(clean_title)
+    labeled_time_line = next(
+        (ln for ln in text.splitlines() if _TIME_LABEL_REGEX.search(ln)),
+        "",
+    )
+    course_date = (
+        normalize_roc_date(labeled_time_line)
+        or normalize_roc_date(text)
+        or normalize_roc_date(clean_title)
+    )
+    course_time = (
+        extract_time_range(labeled_time_line)
+        or extract_time_range(text)
+        or extract_time_range(clean_title)
+    )
     if not course_time:
         if any(w in text for w in ("全天", "全日", "整日")):
             course_time = "09:00–17:00（全天）"

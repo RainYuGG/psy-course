@@ -115,6 +115,7 @@ class TestExtractTimeRange:
             ("時間：115年7月29日 09:30~17:00", "09:30–17:00"),
             ("13:30至16:30（共3小時）", "13:30–16:30"),
             ("時間：15:00", "15:00"),
+            ("2026-11-10 13:00 起\n2026-11-10 14:00 止", "13:00–14:00"),
             ("無時間資訊的段落", ""),
         ],
     )
@@ -133,6 +134,10 @@ class TestExtractFee:
             ("費用：會員 $800 / 非會員 $1,200", "$800"),
             ("收費標準：$1500（含教材）", "$1500（含教材）"),
             ("報名費：新台幣 2,000 元整", "2,000"),
+            (
+                "【工作坊費用】（\n早鳥截止日為\n2026/12/11(\n五\n)\n）\n身分類別\n早鳥價\n3,000元",
+                "3,000",
+            ),
         ],
     )
     def test_extract_fee(self, raw_text: str, expected_substring: str) -> None:
@@ -141,6 +146,28 @@ class TestExtractFee:
 
     def test_extract_fee_empty_when_unspecified(self) -> None:
         assert extract_fee("請於期限內完成線上報名。") == ""
+
+    def test_fee_window_stops_at_next_section_label(self) -> None:
+        text = "課程費用：（另見下方）\n課程時間：2026-12-20 09:00-17:00\n報名費 500元"
+        assert extract_fee(text) == ""
+
+    def test_labeled_course_time_line_beats_earlier_sidebar_times(self) -> None:
+        text = (
+            "其他課程 09:00–17:00 舊課程一覽\n"
+            "課程時間：2027-1-22(五)-1-24(日) 8:30~17:30\n"
+            "報名費：3,000元"
+        )
+        record = extract_course_from_page(
+            title="EMDR基礎訓練：Weekend 2",
+            html=f"<html><body><h1>EMDR基礎訓練：Weekend 2</h1><p>{text}</p></body></html>",
+            detail_url="https://example.org/course",
+            source_platform="測試平台",
+            default_organizer="測試學會",
+            created_at="2026-11-10",
+        )
+        assert record.course_date == "116/01/22–116/01/24"
+        assert record.course_time == "08:30–17:30"
+        assert record.fee == "3,000元"
 
 
 class TestExtractLocationMode:
