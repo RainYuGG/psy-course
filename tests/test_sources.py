@@ -645,6 +645,39 @@ class TestCatalogScrapersAndFaultIsolation:
         assert records[0].registration_period == "即日起～115/11/22"
         assert records[0].course_time == "08:30–16:00"
 
+    def test_fee_table_range_extraction(self) -> None:
+        listing = (
+            "<html><body>"
+            '<a href="/course-id-234">2027 遊戲治療初階工作坊（南部場）</a>'
+            "</body></html>"
+        )
+        detail = (
+            "<html><body><h1>2027 遊戲治療初階工作坊（南部場）</h1>"
+            "<table>"
+            "<tr><th>報名類別</th><th>四日課程</th><th>三日課程</th></tr>"
+            "<tr><th>每人費用</th><th>早鳥價 7000 / 一般價格 7500</th><th>早鳥價 6500 / 一般價格 7000</th></tr>"
+            "<tr><td>非會員</td><td>8000</td><td>9000</td></tr>"
+            "</table>"
+            "</body></html>"
+        )
+        fake_client = FakeHttpClient(
+            {
+                "https://www.atpt.example.org/": listing,
+                "https://www.atpt.example.org/course-id-234": detail,
+            }
+        )
+
+        class TestAtptScraper(GenericCatalogScraper):
+            source_id = "test_atpt"
+            source_name = "測試遊療學會"
+            default_organizer = "測試遊療學會"
+            listing_urls = ("https://www.atpt.example.org/",)
+            fee_table = True
+
+        records = TestAtptScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        assert records[0].fee == "6,500–9,000元"
+
     def test_fetch_all_sources_isolates_errors_and_returns_whitelist_and_statuses(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
