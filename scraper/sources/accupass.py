@@ -5,12 +5,19 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta, timezone
 
-from scraper.extractor import extract_course_from_page, is_registration_closed
+from scraper.extractor import extract_course_from_page
 from scraper.models import CourseRecord
 from scraper.sources.base import BaseSourceScraper, is_likely_course_title
 
-_API_URL = "https://api.accupass.com/v3/search/SearchEvents"
+_SEARCH_API_URL = "https://api.accupass.com/v3/search/SearchEvents"
+_DETAIL_API_URL = "https://api.accupass.com/v3/events/{event_id}"
 _EVENT_URL = "https://www.accupass.com/event/{event_id}"
+
+_API_HEADERS = {
+    "Content-Type": "application/json",
+    "Origin": "https://www.accupass.com",
+    "Referer": "https://www.accupass.com/",
+}
 
 # Psychology-CE-focused keywords; the API returns all matching events, and
 # is_likely_course_title plus the upcoming-date filter trim the rest.
@@ -30,8 +37,60 @@ def _roc_date_str(local_date: date) -> str:
     return f"{local_date.year - 1911:03d}/{local_date.month:02d}/{local_date.day:02d}"
 
 
+def _local_dt(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _detail_fields(detail: dict) -> dict:
+    """Pull date/time/fee/mode/organizer/address/description from the event detail JSON."""
+    event_time = detail.get("eventTimeObj") or {}
+    start_dt = _local_dt(str(event_time.get("startDateTime") or ""))
+    end_dt = _local_dt(str(event_time.get("endDateTime") or ""))
+
+    course_date = ""
+    if start_dt is not None:
+        if end_dt is not None and end_dt.date() > start_dt.date():
+            course_date = f"{_roc_date_str(start_dt.date())}–{_roc_date_str(end_dt.date())}"
+        else:
+            course_date = _roc_date_str(start_dt.date())
+
+    course_time = ""
+    if start_dt is not None and end_dt is not None and end_dt.date() == start_dt.date():
+        course_time = f"{start_dt:%H:%M}–{end_dt:%H:%M}"
+
+    fee = ""
+    if detail.get("isFree"):
+        fee = "免費"
+    else:
+        register_btn = detail.get("registerBtn") or {}
+        try:
+            price_num = float(register_btn.get("price") or 0)
+        except (TypeError, ValueError):
+            price_num = 0.0
+        currency = str(register_btn.get("currency") or "")
+        if price_num > 0:
+            fee = f"{currency}{price_num:g}"
+        elif any("免費" in str(tag.get("name") or "") for tag in detail.get("tags") or []):
+            fee = "免費"
+
+    mode = {"Online": "線上", "Offline": "實體"}.get(str(detail.get("eventPlaceType") or ""), "")
+    organizer = str((detail.get("organizer") or {}).get("title") or "").strip()
+    return {
+        "course_date": course_date,
+        "course_time": course_time,
+        "fee": fee,
+        "mode": mode,
+        "organizer": organizer,
+        "address": str(detail.get("address") or "").strip(),
+        "description": str(detail.get("description") or "").strip(),
+    }
+
+
 class AccupassScraper(BaseSourceScraper):
-    """Scrape AccuPass events via the site's public SearchEvents JSON API."""
+    """Scrape AccuPass events via the site's public search + event-detail JSON APIs."""
 
     source_id = "accupass"
     source_name = "AccuPass 活動平台"
@@ -56,16 +115,7 @@ class AccupassScraper(BaseSourceScraper):
                 "keyword": keyword,
             }
             try:
-                text = client.post_json(
-                    _API_URL,
-                    body,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Origin": "https://www.accupass.com",
-                        "Referer": "https://www.accupass.com/",
-                    },
-                )
-                data = json.loads(text)
+                data = json.loads(client.post_json(_SEARCH_API_URL, body, headers=_API_HEADERS))
                 any_request_ok = True
             except Exception as exc:
                 last_error = exc
@@ -77,31 +127,44 @@ class AccupassScraper(BaseSourceScraper):
                 if not event_id or event_id in seen_ids or not is_likely_course_title(name):
                     continue
                 start_local = _parse_local_date(str(item.get("startDateTime") or ""))
-                end_local = _parse_local_date(str(item.get("endDateTime") or ""))
                 if start_local is not None and start_local < today_local:
                     continue  # already started; upcoming filter would drop it anyway
                 seen_ids.add(event_id)
-                detail_url = _EVENT_URL.format(event_id=event_id)
+
                 try:
-                    detail_html = client.get_text(detail_url)
+                    detail = json.loads(client.get_text(_DETAIL_API_URL.format(event_id=event_id)))
                 except Exception:
-                    detail_html = ""
-                if is_registration_closed(name, detail_html):
                     continue
+                if (detail.get("registerBtn") or {}).get("isDisabled"):
+                    continue  # registration closed
+
+                fields = _detail_fields(detail)
+                html_parts = [f"<html><body><h1>{name}</h1>"]
+                if fields["mode"]:
+                    html_parts.append(f"<p>上課方式：{fields['mode']}</p>")
+                if fields["address"]:
+                    html_parts.append(f"<p>地點：{fields['address']}</p>")
+                if fields["fee"]:
+                    html_parts.append(f"<p>報名費用：{fields['fee']}</p>")
+                if fields["description"]:
+                    html_parts.append(f"<p>{fields['description']}</p>")
+                html_parts.append("</body></html>")
                 record = extract_course_from_page(
                     title=name,
-                    html=detail_html or f"<html><body><h1>{name}</h1></body></html>",
-                    detail_url=detail_url,
+                    html="".join(html_parts),
+                    detail_url=_EVENT_URL.format(event_id=event_id),
                     source_platform=self.source_name,
-                    default_organizer=self.default_organizer,
+                    default_organizer=fields["organizer"] or self.default_organizer,
                     created_at=created_date,
                 )
-                if not record.course_date and start_local is not None:
-                    # Event pages print weekday+time only; the API carries the real date.
-                    if end_local is not None and end_local > start_local:
-                        record.course_date = f"{_roc_date_str(start_local)}–{_roc_date_str(end_local)}"
-                    else:
-                        record.course_date = _roc_date_str(start_local)
+                if fields["course_date"]:
+                    record.course_date = fields["course_date"]
+                if fields["course_time"]:
+                    record.course_time = fields["course_time"]
+                if fields["fee"]:
+                    record.fee = fields["fee"]
+                if fields["mode"]:
+                    record.location_mode = fields["mode"]
                 records.append(record)
 
         if not any_request_ok and last_error is not None:

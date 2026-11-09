@@ -21,8 +21,8 @@ _DATE_RANGE_REGEX = re.compile(
     + r"(?P<m2>\d{1,2})\s*(?:月|[./-])\s*(?P<d2>\d{1,2})\s*日?)?"
 )
 
-# Label separators: "：", "】：" and a trailing "／" (value then sits on the next line).
-_LABEL_SEP = r"(?:[：:]|】\s*[：:]?|／\s*$)"
+# Label separators: "：", "】："，"（註解）：" and a trailing "／" (value then sits on the next line).
+_LABEL_SEP = r"(?:[：:]|】\s*[：:]?|（[^（）]{0,60}）\s*[：:]?|／\s*$)"
 # Labels preceded by 報名/截止 (報名日期, 報名時間, 報名截止日期) describe registration, not the course.
 _COURSE_DATE_LABEL_REGEX = re.compile(
     r"(?<!報名)(?<!截止)(?:課程日期|上課日期|活動日期|舉辦日期|研習日期|日期|課程時間|上課時間|活動時間|時間)\s*"
@@ -45,6 +45,7 @@ _REGISTRATION_LINE_KEYWORDS = (
 _TIME_RANGE_REGEX = re.compile(
     r"(?<!\d)([0-2]?\d[:：][0-5]\d)\s*[~～\-–—至到]\s*([0-2]?\d[:：][0-5]\d)(?!\d)"
 )
+_TIME_LABEL_REGEX = re.compile(r"(?:課程時間|上課時間)\s*[：:]")
 _CHINESE_TIME_RANGE_REGEX = re.compile(
     r"(?<!\d)([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?\s*[~～\-–—至到]\s*([0-2]?\d)\s*[時點]\s*([0-5]\d)?\s*分?"
 )
@@ -62,9 +63,11 @@ _OFFICE_HOURS_LINE_KEYWORDS = (
 )
 
 _FEE_LABEL_REGEX = re.compile(r"(?:課程費用|報名費用|報名費|收費標準|費用)\s*" + _LABEL_SEP)
-_FREE_STANDALONE_REGEX = re.compile(r"(?:免收報名費|免費參加|免費報名|全程免費|費用全免|免費(?!名額))")
+_FREE_STANDALONE_REGEX = re.compile(r"(?:免收報名費|免費參加|免費報名|全程免費|費用全免|免費(?!(名額|獲得|領取|出版|贈送|兌換)))")
 # A fee value must carry a price or a free marker; bare words such as 會員 or a lone （ are not fees.
-_FEE_VALUE_REGEX = re.compile(r"(?:NT\$|\$|新台幣)\s*\d|\d[\d,]*\s*元|免費(?!名額)|免收|^\d[\d,]{2,}$")
+_FEE_VALUE_REGEX = re.compile(
+    r"(?:NT\$|\$|新台幣)\s*[\d,]+|\d[\d,]*\s*元|免費(?!名額)|免收|^\d[\d,]{2,}$"
+)
 
 _LOCATION_LABEL_REGEX = re.compile(
     r"(?:上課地點|辦理地點|活動地點|講座地點|研習地點|會場地點|地點|會場|場地|辦理方式|上課方式|進行方式|授課方式)\s*"
@@ -160,7 +163,8 @@ _EXCLUDED_SHARE_PATTERNS = (
 )
 
 _PLAIN_URL_AFTER_REG_LABEL_REGEX = re.compile(
-    r"(?:報名網址|報名連結|報名方式|線上報名|網路報名|報名表單)\s*(?:[：:]|】\s*[：:]?)?\s*(https?://[^\s<>\"'）)]+)"
+    r"(?:報名網址|報名連結|報名方式|線上報名|網路報名|報名表單)\s*(?:[：:]|】\s*[：:]?)?\s*"
+    r"(https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+)"
 )
 _CLOSED_REGISTRATION_REGEX = re.compile(
     r"(?:報名已截止|報名截止|已截止報名|已額滿|名額已滿|停止報名|截止報名)"
@@ -278,6 +282,10 @@ def extract_time_range(text: str) -> str:
 
     filtered = _strip_office_hour_lines(text)
 
+    start_end = re.search(r"(\d{1,2}[:：]\d{2})\s*起[\s\S]{0,80}?(\d{1,2}[:：]\d{2})\s*止", filtered)
+    if start_end:
+        return f"{_pad_hhmm(start_end.group(1))}–{_pad_hhmm(start_end.group(2))}"
+
     match = _TIME_RANGE_REGEX.search(filtered)
     if match:
         start_t = _pad_hhmm(match.group(1))
@@ -336,9 +344,14 @@ def _labelled_value(text: str, label_regex: re.Pattern[str]) -> str:
 
 
 def _normalize_fee(value: str) -> str:
-    if len(value) > 40:
+    if len(value) > 12:
         match = _FEE_VALUE_REGEX.search(value)
-        value = match.group(0) if match else value[:40]
+        if match:
+            token = match.group(0)
+            tail = re.match(r"\s*[元整]*(?:/\s*人)?", value[match.end() :])
+            if tail:
+                token += tail.group(0).strip()
+            value = token
     is_free = any(k in value for k in ("免收報名費", "免費")) or re.search(r"(?<![0-9,])0\s*元", value)
     if is_free and "$" not in value and not re.search(r"[1-9][\d,]*\s*元", value):
         return "免費"
@@ -350,12 +363,21 @@ def extract_fee(text: str) -> str:
     if not text:
         return ""
 
+    # PDF line-wraps split parentheticals like "（…認證\n費）：" — rejoin so the fee label
+    # stays on one line for the label regex.
+    text = re.sub(r"（([^（）\n]{0,60})\n([^\n]{0,6}[）][：:]?)", r"（\1\2", text)
+
     lines = [ln.strip() for ln in text.splitlines()]
     for i, line in enumerate(lines):
         match = _FEE_LABEL_REGEX.search(line)
         if not match:
             continue
-        for candidate in [line[match.end():], *lines[i + 1 : i + 5]]:
+        window: list[str] = []
+        for j in range(i + 1, min(i + 16, len(lines))):
+            if _FEE_LABEL_REGEX.search(lines[j]) or _TIME_LABEL_REGEX.search(lines[j]):
+                break  # next section: stop looking
+            window.append(lines[j])
+        for candidate in [line[match.end():], *window]:
             candidate = re.split(r"[。；;]", candidate)[0].strip().rstrip("，, ")
             if candidate and _FEE_VALUE_REGEX.search(candidate):
                 return _normalize_fee(candidate)
@@ -481,6 +503,10 @@ def extract_registration_url(html: str, detail_url: str) -> str:
         if _is_excluded_url(resolved):
             continue
 
+        parsed_resolved = urlparse(resolved)
+        if parsed_resolved.path in ("", "/") and not parsed_resolved.query:
+            continue  # a bare homepage is never a registration link
+
         lower_resolved = resolved.lower()
         anchor_text = anchor.get_text(" ", strip=True)
         parent_text = anchor.parent.get_text(" ", strip=True) if anchor.parent else ""
@@ -516,7 +542,10 @@ def extract_registration_url(html: str, detail_url: str) -> str:
             return candidate_url
 
     for host in _KNOWN_FORM_HOSTS:
-        host_match = re.search(rf"https?://[^\s<>\"'）)]*{re.escape(host)}[^\s<>\"'）)]*", plain_text)
+        host_match = re.search(
+            rf"https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*{re.escape(host)}[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*",
+            plain_text,
+        )
         if host_match:
             return _unwrap_redirect_url(host_match.group(0).rstrip("。，,；;"))
 
@@ -622,8 +651,20 @@ def extract_course_from_page(
             clean_title = short_match.group(1).strip()
 
     organizer = _extract_organizer(clean_title, text, default_organizer, source_platform)
-    course_date = normalize_roc_date(text) or normalize_roc_date(clean_title)
-    course_time = extract_time_range(text) or extract_time_range(clean_title)
+    labeled_time_line = next(
+        (ln for ln in text.splitlines() if _TIME_LABEL_REGEX.search(ln)),
+        "",
+    )
+    course_date = (
+        normalize_roc_date(labeled_time_line)
+        or normalize_roc_date(text)
+        or normalize_roc_date(clean_title)
+    )
+    course_time = (
+        extract_time_range(labeled_time_line)
+        or extract_time_range(text)
+        or extract_time_range(clean_title)
+    )
     if not course_time:
         if any(w in text for w in ("全天", "全日", "整日")):
             course_time = "09:00–17:00（全天）"

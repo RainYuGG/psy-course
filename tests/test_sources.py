@@ -18,6 +18,7 @@ from scraper.sources.base import (
     is_likely_course_title,
 )
 from scraper.sources.catalog_scrapers import (
+    GenericCatalogScraper,
     AcftEftScraper,
     AtptScraper,
     EcataScraper,
@@ -47,11 +48,14 @@ class FakeHttpClient:
         self,
         responses: dict[str, str | Exception],
         post_responses: dict[str, str | Exception] | None = None,
+        byte_responses: dict[str, bytes] | None = None,
     ) -> None:
         self.responses = responses
         self.post_responses = post_responses or {}
+        self.byte_responses = byte_responses or {}
         self.requested_urls: list[str] = []
         self.post_bodies: list[tuple[str, dict]] = []
+
     def get_text(self, url: str) -> str:
         self.requested_urls.append(url)
         if url not in self.responses:
@@ -64,6 +68,12 @@ class FakeHttpClient:
         if isinstance(val, Exception):
             raise val
         return val
+
+    def get_bytes(self, url: str) -> bytes:
+        self.requested_urls.append(url)
+        if url not in self.byte_responses:
+            raise httpx.RequestError(f"no bytes response configured for {url}")
+        return self.byte_responses[url]
 
     def post_json(self, url: str, payload: dict, headers: dict | None = None) -> str:
         self.post_bodies.append((url, payload))
@@ -423,13 +433,24 @@ class TestAccupassScraper:
                 ],
             }
         )
-        detail = (
-            "<html><body><h1>115年度創傷知情臨床實務工作坊</h1>"
-            "<p>上課時間：14:00-17:00</p><p>地點：線上</p>"
-            "<p>本課程申請臨床心理師繼續教育積分。</p></body></html>"
+        detail = json.dumps(
+            {
+                "eventIdNumber": "111",
+                "title": "115年度創傷知情臨床實務工作坊",
+                "isFree": True,
+                "eventPlaceType": "Offline",
+                "eventTimeObj": {
+                    "startDateTime": "2026-12-20T14:00:00",
+                    "endDateTime": "2026-12-20T17:00:00",
+                },
+                "registerBtn": {"isDisabled": False, "price": 0, "currency": "NT$"},
+                "organizer": {"title": "創傷治療學會"},
+                "address": "台北市大安區某路1號",
+                "description": "本課程申請臨床心理師繼續教育積分。",
+            }
         )
         fake = FakeHttpClient(
-            responses={"https://www.accupass.com/event/111": detail},
+            responses={"https://api.accupass.com/v3/events/111": detail},
             post_responses={"https://api.accupass.com/v3/search/SearchEvents": api_payload},
         )
         scraper = AccupassScraper()
@@ -437,12 +458,50 @@ class TestAccupassScraper:
 
         assert len(records) == 1
         assert records[0].course_name == "115年度創傷知情臨床實務工作坊"
+        assert records[0].course_date == "115/12/20"
         assert records[0].course_time == "14:00–17:00"
+        assert records[0].fee == "免費"
+        assert records[0].location_mode == "實體"
+        assert records[0].organizer == "創傷治療學會"
         assert records[0].has_clinical_credit == "是"
         assert records[0].registration_url == "https://www.accupass.com/event/111"
         assert len(fake.post_bodies) == 3
         assert all(b[1]["keyword"] for b in fake.post_bodies)
-        assert "https://www.accupass.com/event/222" not in fake.requested_urls
+        assert "https://api.accupass.com/v3/events/222" not in fake.requested_urls
+
+    def test_accupass_zero_price_with_free_tag_marks_fee_free(self) -> None:
+        api_payload = json.dumps(
+            {
+                "total": 1,
+                "items": [
+                    {
+                        "eventIdNumber": "444",
+                        "name": "115年度免費公開講座",
+                        "startDateTime": "2026-12-20T01:00:00Z",
+                    },
+                ],
+            }
+        )
+        detail = json.dumps(
+            {
+                "eventIdNumber": "444",
+                "isFree": False,
+                "eventPlaceType": "Online",
+                "eventTimeObj": {
+                    "startDateTime": "2026-12-20T14:00:00",
+                    "endDateTime": "2026-12-20T15:00:00",
+                },
+                "registerBtn": {"isDisabled": False, "price": 0, "currency": "NT$"},
+                "tags": [{"name": "免費"}],
+            }
+        )
+        fake = FakeHttpClient(
+            responses={"https://api.accupass.com/v3/events/444": detail},
+            post_responses={"https://api.accupass.com/v3/search/SearchEvents": api_payload},
+        )
+        records = AccupassScraper().scrape(fake, created_at="2026-11-09")
+        assert len(records) == 1
+        assert records[0].fee == "免費"
 
 
 class TestCatalogScrapersAndFaultIsolation:
@@ -532,6 +591,59 @@ class TestCatalogScrapersAndFaultIsolation:
         assert status["source"] == scraper.source_name
         assert status["status"] == "error"
         assert "503" in status["error"]
+
+    def test_pdf_attachment_overrides_fee_and_period(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import pypdf
+
+        class FakePage:
+            def extract_text(self) -> str:
+                return (
+                    "報名期限及收費標準（費用包含雲端講義、午餐點心、出席證明之學分認證）：\n"
+                    "115年12月21日（星期一）\n"
+                    "報名期限及費用 團體/個人會員 學生會員 非會員\n"
+                    "即日起～115/11/22 3,500元/人 2,000元/人 4,000元/人\n"
+                    "08:30～08:55 25分鐘 學員報到\n"
+                    "09:00～12:00 180分鐘 上午課程\n"
+                    "13:00～16:00 180分鐘 下午課程"
+                )
+
+        class FakeReader:
+            def __init__(self, data: bytes) -> None:
+                self.pages = [FakePage(), FakePage()]
+
+        monkeypatch.setattr(pypdf, "PdfReader", FakeReader)
+
+        listing = (
+            "<html><body>"
+            '<a href="/news/1.html">115年12月21日 臨床心理師工作坊 轉知</a>'
+            "</body></html>"
+        )
+        detail = (
+            "<html><body><h1>115年12月21日 臨床心理師工作坊</h1>"
+            "<p>五、前5名完成報名者可免費獲得教材1本</p>"
+            '<a href="https://files.example.com/a.pdf">附件</a>'
+            "</body></html>"
+        )
+        fake_client = FakeHttpClient(
+            {
+                "https://www.example.org/": listing,
+                "https://www.example.org/news/1.html": detail,
+            },
+            byte_responses={"https://files.example.com/a.pdf": b"fakepdf"},
+        )
+
+        class TestBureauScraper(GenericCatalogScraper):
+            source_id = "test_bureau"
+            source_name = "測試衛生局"
+            default_organizer = "測試衛生局"
+            listing_urls = ("https://www.example.org/",)
+            max_pdf_attachments = 2
+
+        records = TestBureauScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        assert records[0].fee == "3,500元/人"
+        assert records[0].registration_period == "即日起～115/11/22"
+        assert records[0].course_time == "08:30–16:00"
 
     def test_fetch_all_sources_isolates_errors_and_returns_whitelist_and_statuses(
         self, monkeypatch: pytest.MonkeyPatch

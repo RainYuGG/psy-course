@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import io
+import re
+
+
+
 from datetime import date
 from urllib.parse import urljoin, urlparse
-
 from bs4 import BeautifulSoup
 
-from scraper.extractor import extract_course_from_page, is_registration_closed, normalize_roc_date
+from scraper.extractor import (
+    extract_course_from_page,
+    extract_fee,
+    extract_registration_period,
+    is_registration_closed,
+    normalize_roc_date,
+)
+
 from scraper.models import CourseRecord
 from scraper.sources.base import (
     COURSE_INDICATOR_KEYWORDS,
@@ -30,6 +41,18 @@ _SKIP_HREF_TOKENS = (
     "youtube.com",
     "line.me",
 )
+
+_SCHEDULE_RANGE_RE = re.compile(r"(\d{1,2})[:：](\d{2})\s*[~～\-–—]\s*(\d{1,2})[:：](\d{2})")
+
+
+def _schedule_span(text: str) -> str:
+    """Min-start to max-end span of a 3+-row schedule table (agenda PDFs)."""
+    ranges = _SCHEDULE_RANGE_RE.findall(text)
+    if len(ranges) < 3:
+        return ""
+    starts = [f"{int(h):02d}:{m}" for h, m, _, _ in ranges]
+    ends = [f"{int(h):02d}:{m}" for _, _, h, m in ranges]
+    return f"{min(starts)}–{max(ends)}"
 
 _URL_COURSE_HINTS = (
     "course",
@@ -55,11 +78,48 @@ class GenericCatalogScraper(BaseSourceScraper):
 
     listing_urls: tuple[str, ...] = ()
     max_items: int = 12
+    # Beclass course pages (rid=...) are themselves the registration form.
+    registration_url_is_detail: bool = False
+    # Government 轉知 articles keep fee/registration details in attached PDFs.
+    max_pdf_attachments: int = 0
 
     def get_listing_urls(self) -> tuple[str, ...]:
         if self.listing_urls:
             return self.listing_urls
         return (self.base_url,)
+
+    def _pdf_attachment_text(self, client, detail_html: str, detail_url: str) -> str:
+        """Download attached PDFs from the detail page and return their extracted text."""
+        if not self.max_pdf_attachments or not detail_html:
+            return ""
+        soup = BeautifulSoup(detail_html, "lxml")
+        texts: list[str] = []
+        seen_urls: set[str] = set()
+        for anchor in soup.find_all("a", href=True):
+            href = str(anchor.get("href") or "").strip()
+            if not href.lower().endswith(".pdf"):
+                continue
+            url = urljoin(detail_url, href)
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            try:
+                data = client.get_bytes(url)
+            except Exception:
+                continue
+            try:
+                from pypdf import PdfReader
+
+                reader = PdfReader(io.BytesIO(data))
+                text = "\n".join((page.extract_text() or "") for page in reader.pages[:4])
+            except Exception:
+                continue
+            if text.strip():
+                texts.append(text)
+            if len(texts) >= self.max_pdf_attachments:
+                break
+        return "\n".join(texts)[:6000]
+
 
     def _is_candidate_link(self, title: str, resolved_url: str, base_url: str) -> bool:
         if not is_likely_course_title(title):
@@ -144,6 +204,19 @@ class GenericCatalogScraper(BaseSourceScraper):
                     default_organizer=self.default_organizer,
                     created_at=created_date,
                 )
+                if self.max_pdf_attachments and detail_html:
+                    pdf_text = self._pdf_attachment_text(client, detail_html, detail_url)
+                    if pdf_text:
+                        pdf_fee = extract_fee(pdf_text)
+                        if pdf_fee:
+                            record.fee = pdf_fee
+                        pdf_period = extract_registration_period(pdf_text)
+                        if pdf_period:
+                            record.registration_period = pdf_period
+                        if not record.course_time or record.course_time == "詳見簡章":
+                            record.course_time = _schedule_span(pdf_text) or record.course_time
+                if self.registration_url_is_detail:
+                    record.registration_url = detail_url
                 records.append(record)
             # Fallback for single-page sites (e.g. Google Sites) where courses are inline blocks
             if not candidates:
@@ -213,5 +286,7 @@ for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
             "default_organizer": _org,
             "base_url": _urls[0],
             "listing_urls": _urls,
+            "registration_url_is_detail": _sid == "beclass",
+            "max_pdf_attachments": 3 if _sid in ("taipei_health", "kaohsiung_health") else 0,
         },
     )
