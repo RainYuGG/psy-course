@@ -423,13 +423,24 @@ class TestAccupassScraper:
                 ],
             }
         )
-        detail = (
-            "<html><body><h1>115年度創傷知情臨床實務工作坊</h1>"
-            "<p>上課時間：14:00-17:00</p><p>地點：線上</p>"
-            "<p>本課程申請臨床心理師繼續教育積分。</p></body></html>"
+        detail = json.dumps(
+            {
+                "eventIdNumber": "111",
+                "title": "115年度創傷知情臨床實務工作坊",
+                "isFree": True,
+                "eventPlaceType": "Offline",
+                "eventTimeObj": {
+                    "startDateTime": "2026-12-20T14:00:00",
+                    "endDateTime": "2026-12-20T17:00:00",
+                },
+                "registerBtn": {"isDisabled": False, "price": 0, "currency": "NT$"},
+                "organizer": {"title": "創傷治療學會"},
+                "address": "台北市大安區某路1號",
+                "description": "本課程申請臨床心理師繼續教育積分。",
+            }
         )
         fake = FakeHttpClient(
-            responses={"https://www.accupass.com/event/111": detail},
+            responses={"https://api.accupass.com/v3/events/111": detail},
             post_responses={"https://api.accupass.com/v3/search/SearchEvents": api_payload},
         )
         scraper = AccupassScraper()
@@ -437,12 +448,16 @@ class TestAccupassScraper:
 
         assert len(records) == 1
         assert records[0].course_name == "115年度創傷知情臨床實務工作坊"
+        assert records[0].course_date == "115/12/20"
         assert records[0].course_time == "14:00–17:00"
+        assert records[0].fee == "免費"
+        assert records[0].location_mode == "實體"
+        assert records[0].organizer == "創傷治療學會"
         assert records[0].has_clinical_credit == "是"
         assert records[0].registration_url == "https://www.accupass.com/event/111"
         assert len(fake.post_bodies) == 3
         assert all(b[1]["keyword"] for b in fake.post_bodies)
-        assert "https://www.accupass.com/event/222" not in fake.requested_urls
+        assert "https://api.accupass.com/v3/events/222" not in fake.requested_urls
 
 
 class TestCatalogScrapersAndFaultIsolation:

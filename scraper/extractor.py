@@ -160,7 +160,8 @@ _EXCLUDED_SHARE_PATTERNS = (
 )
 
 _PLAIN_URL_AFTER_REG_LABEL_REGEX = re.compile(
-    r"(?:報名網址|報名連結|報名方式|線上報名|網路報名|報名表單)\s*(?:[：:]|】\s*[：:]?)?\s*(https?://[^\s<>\"'）)]+)"
+    r"(?:報名網址|報名連結|報名方式|線上報名|網路報名|報名表單)\s*(?:[：:]|】\s*[：:]?)?\s*"
+    r"(https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+)"
 )
 _CLOSED_REGISTRATION_REGEX = re.compile(
     r"(?:報名已截止|報名截止|已截止報名|已額滿|名額已滿|停止報名|截止報名)"
@@ -481,6 +482,10 @@ def extract_registration_url(html: str, detail_url: str) -> str:
         if _is_excluded_url(resolved):
             continue
 
+        parsed_resolved = urlparse(resolved)
+        if parsed_resolved.path in ("", "/") and not parsed_resolved.query:
+            continue  # a bare homepage is never a registration link
+
         lower_resolved = resolved.lower()
         anchor_text = anchor.get_text(" ", strip=True)
         parent_text = anchor.parent.get_text(" ", strip=True) if anchor.parent else ""
@@ -516,7 +521,10 @@ def extract_registration_url(html: str, detail_url: str) -> str:
             return candidate_url
 
     for host in _KNOWN_FORM_HOSTS:
-        host_match = re.search(rf"https?://[^\s<>\"'）)]*{re.escape(host)}[^\s<>\"'）)]*", plain_text)
+        host_match = re.search(
+            rf"https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*{re.escape(host)}[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*",
+            plain_text,
+        )
         if host_match:
             return _unwrap_redirect_url(host_match.group(0).rstrip("。，,；;"))
 

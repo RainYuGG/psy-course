@@ -55,6 +55,8 @@ class GenericCatalogScraper(BaseSourceScraper):
 
     listing_urls: tuple[str, ...] = ()
     max_items: int = 12
+    # Beclass course pages (rid=...) are themselves the registration form.
+    registration_url_is_detail: bool = False
 
     def get_listing_urls(self) -> tuple[str, ...]:
         if self.listing_urls:
@@ -144,6 +146,8 @@ class GenericCatalogScraper(BaseSourceScraper):
                     default_organizer=self.default_organizer,
                     created_at=created_date,
                 )
+                if self.registration_url_is_detail:
+                    record.registration_url = detail_url
                 records.append(record)
             # Fallback for single-page sites (e.g. Google Sites) where courses are inline blocks
             if not candidates:
@@ -213,5 +217,6 @@ for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
             "default_organizer": _org,
             "base_url": _urls[0],
             "listing_urls": _urls,
+            "registration_url_is_detail": _sid == "beclass",
         },
     )
