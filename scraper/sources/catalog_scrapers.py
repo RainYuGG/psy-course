@@ -54,6 +54,23 @@ def _schedule_span(text: str) -> str:
     ends = [f"{int(h):02d}:{m}" for _, _, h, m in ranges]
     return f"{min(starts)}–{max(ends)}"
 
+
+def _fee_range_from_table(detail_html: str) -> str:
+    """Min–max price across a multi-tier fee table (會員/學生/非會員 × 早鳥/一般)."""
+    soup = BeautifulSoup(detail_html, "lxml")
+    for table in soup.find_all("table"):
+        text = table.get_text(" ", strip=True)
+        if "每人費用" not in text and "早鳥價" not in text:
+            continue
+        nums: list[int] = []
+        for cell in table.find_all(["td", "th"]):
+            for digits in re.findall(r"[\d,]+", cell.get_text(strip=True)):
+                if digits.replace(",", "").isdigit() and int(digits.replace(",", "")) >= 100:
+                    nums.append(int(digits.replace(",", "")))
+        if len(nums) >= 2:
+            return f"{min(nums):,}–{max(nums):,}元"
+    return ""
+
 _URL_COURSE_HINTS = (
     "course",
     "event",
@@ -82,6 +99,8 @@ class GenericCatalogScraper(BaseSourceScraper):
     registration_url_is_detail: bool = False
     # Government 轉知 articles keep fee/registration details in attached PDFs.
     max_pdf_attachments: int = 0
+    # Sites with multi-tier fee tables on the public course page.
+    fee_table: bool = False
 
     def get_listing_urls(self) -> tuple[str, ...]:
         if self.listing_urls:
@@ -215,6 +234,10 @@ class GenericCatalogScraper(BaseSourceScraper):
                             record.registration_period = pdf_period
                         if not record.course_time or record.course_time == "詳見簡章":
                             record.course_time = _schedule_span(pdf_text) or record.course_time
+                if self.fee_table:
+                    table_fee = _fee_range_from_table(detail_html)
+                    if table_fee:
+                        record.fee = table_fee
                 if self.registration_url_is_detail:
                     record.registration_url = detail_url
                 records.append(record)
@@ -288,5 +311,6 @@ for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
             "listing_urls": _urls,
             "registration_url_is_detail": _sid == "beclass",
             "max_pdf_attachments": 3 if _sid in ("taipei_health", "kaohsiung_health") else 0,
+            "fee_table": _sid == "atpt",
         },
     )
