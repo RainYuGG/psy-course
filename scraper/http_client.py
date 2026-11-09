@@ -86,6 +86,41 @@ class HttpClient:
                 return self._fetch_with_verify(url, verify=False)
             raise
 
+    def _fetch_bytes_with_verify(self, url: str, verify: bool) -> bytes:
+        last_exc: Exception | None = None
+        total_attempts = self.retries + 1
+        with httpx.Client(
+            timeout=self.timeout,
+            headers=self.headers,
+            follow_redirects=True,
+            verify=verify,
+        ) as client:
+            for _ in range(total_attempts):
+                try:
+                    response = client.get(url)
+                    response.raise_for_status()
+                    return response.content
+                except httpx.HTTPStatusError as exc:
+                    last_exc = exc
+                    if exc.response.status_code < 500:
+                        raise
+                except httpx.RequestError as exc:
+                    last_exc = exc
+                    if verify and _is_ssl_error(exc):
+                        raise
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"Failed to fetch {url}")
+
+    def get_bytes(self, url: str) -> bytes:
+        """Fetch URL raw bytes with the same retry/verify-fallback policy as get_text."""
+        try:
+            return self._fetch_bytes_with_verify(url, verify=True)
+        except Exception as exc:
+            if _is_ssl_error(exc):
+                return self._fetch_bytes_with_verify(url, verify=False)
+            raise
+
     def get(self, url: str, **kwargs: Any) -> str:
         """Alias for get_text for convenience."""
         return self.get_text(url)

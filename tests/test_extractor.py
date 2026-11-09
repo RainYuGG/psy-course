@@ -147,6 +147,9 @@ class TestExtractFee:
     def test_extract_fee_empty_when_unspecified(self) -> None:
         assert extract_fee("請於期限內完成線上報名。") == ""
 
+    def test_free_book_mention_is_not_a_free_course(self) -> None:
+        assert extract_fee("五、前5名完成報名者可免費獲得教材1本") == ""
+
     def test_fee_window_stops_at_next_section_label(self) -> None:
         text = "課程費用：（另見下方）\n課程時間：2026-12-20 09:00-17:00\n報名費 500元"
         assert extract_fee(text) == ""
@@ -385,7 +388,7 @@ class TestExtractFeeRejectsNonPrice:
             ("費用：（含講義、午餐）\n一般報名 $2,500", "一般報名 $2,500"),
             (
                 "2026年會暨學術研討會費用：\n會員\n請於報名時上傳會員證明\n協辦單位師生優惠價1000元",
-                "協辦單位師生優惠價1000元",
+                "1000元",
             ),
             ("協辦單位師生前20名免費名額「已額滿」", ""),
         ],

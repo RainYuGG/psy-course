@@ -18,6 +18,7 @@ from scraper.sources.base import (
     is_likely_course_title,
 )
 from scraper.sources.catalog_scrapers import (
+    GenericCatalogScraper,
     AcftEftScraper,
     AtptScraper,
     EcataScraper,
@@ -47,11 +48,14 @@ class FakeHttpClient:
         self,
         responses: dict[str, str | Exception],
         post_responses: dict[str, str | Exception] | None = None,
+        byte_responses: dict[str, bytes] | None = None,
     ) -> None:
         self.responses = responses
         self.post_responses = post_responses or {}
+        self.byte_responses = byte_responses or {}
         self.requested_urls: list[str] = []
         self.post_bodies: list[tuple[str, dict]] = []
+
     def get_text(self, url: str) -> str:
         self.requested_urls.append(url)
         if url not in self.responses:
@@ -64,6 +68,12 @@ class FakeHttpClient:
         if isinstance(val, Exception):
             raise val
         return val
+
+    def get_bytes(self, url: str) -> bytes:
+        self.requested_urls.append(url)
+        if url not in self.byte_responses:
+            raise httpx.RequestError(f"no bytes response configured for {url}")
+        return self.byte_responses[url]
 
     def post_json(self, url: str, payload: dict, headers: dict | None = None) -> str:
         self.post_bodies.append((url, payload))
@@ -581,6 +591,59 @@ class TestCatalogScrapersAndFaultIsolation:
         assert status["source"] == scraper.source_name
         assert status["status"] == "error"
         assert "503" in status["error"]
+
+    def test_pdf_attachment_overrides_fee_and_period(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import pypdf
+
+        class FakePage:
+            def extract_text(self) -> str:
+                return (
+                    "報名期限及收費標準（費用包含雲端講義、午餐點心、出席證明之學分認證）：\n"
+                    "115年12月21日（星期一）\n"
+                    "報名期限及費用 團體/個人會員 學生會員 非會員\n"
+                    "即日起～115/11/22 3,500元/人 2,000元/人 4,000元/人\n"
+                    "08:30～08:55 25分鐘 學員報到\n"
+                    "09:00～12:00 180分鐘 上午課程\n"
+                    "13:00～16:00 180分鐘 下午課程"
+                )
+
+        class FakeReader:
+            def __init__(self, data: bytes) -> None:
+                self.pages = [FakePage(), FakePage()]
+
+        monkeypatch.setattr(pypdf, "PdfReader", FakeReader)
+
+        listing = (
+            "<html><body>"
+            '<a href="/news/1.html">115年12月21日 臨床心理師工作坊 轉知</a>'
+            "</body></html>"
+        )
+        detail = (
+            "<html><body><h1>115年12月21日 臨床心理師工作坊</h1>"
+            "<p>五、前5名完成報名者可免費獲得教材1本</p>"
+            '<a href="https://files.example.com/a.pdf">附件</a>'
+            "</body></html>"
+        )
+        fake_client = FakeHttpClient(
+            {
+                "https://www.example.org/": listing,
+                "https://www.example.org/news/1.html": detail,
+            },
+            byte_responses={"https://files.example.com/a.pdf": b"fakepdf"},
+        )
+
+        class TestBureauScraper(GenericCatalogScraper):
+            source_id = "test_bureau"
+            source_name = "測試衛生局"
+            default_organizer = "測試衛生局"
+            listing_urls = ("https://www.example.org/",)
+            max_pdf_attachments = 2
+
+        records = TestBureauScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        assert records[0].fee == "3,500元/人"
+        assert records[0].registration_period == "即日起～115/11/22"
+        assert records[0].course_time == "08:30–16:00"
 
     def test_fetch_all_sources_isolates_errors_and_returns_whitelist_and_statuses(
         self, monkeypatch: pytest.MonkeyPatch
