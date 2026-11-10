@@ -193,7 +193,12 @@ def _enrich_with_whitelist(
         "",
         whitelist_match={"cert_no": matched.cert_no, "category": matched.category},
     )
-    merged_evidence = _merge_evidence(official_evidence, course.credit_evidence)
+    # A "否" verdict from the source contradicts the official approval; keep only the official evidence.
+    merged_evidence = (
+        official_evidence
+        if course.has_clinical_credit == "否"
+        else _merge_evidence(official_evidence, course.credit_evidence)
+    )
     organizer = course.organizer
     if (not organizer or organizer == course.source_platform) and matched.organizer:
         organizer = matched.organizer

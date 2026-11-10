@@ -507,7 +507,7 @@ class TestAccupassScraper:
 class TestCatalogScrapersAndFaultIsolation:
     """Tests for the 17 association/platform catalog scrapers, ALL_SCRAPERS registry, and HTTP 503 fault isolation."""
 
-    def test_all_20_scrapers_registered(self) -> None:
+    def test_all_22_scrapers_registered(self) -> None:
         scraper_ids = [s.source_id for s in ALL_SCRAPERS]
         expected_ids = [
             "taclip",
@@ -530,6 +530,8 @@ class TestCatalogScrapersAndFaultIsolation:
             "taipei_health",
             "kaohsiung_health",
             "accupass",
+            "tapedpmr",
+            "asia_eft",
         ]
         assert scraper_ids == expected_ids
 
@@ -677,6 +679,143 @@ class TestCatalogScrapersAndFaultIsolation:
         records = TestAtptScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
         assert len(records) == 1
         assert records[0].fee == "6,500–9,000元"
+
+    def test_tapedpmr_activity_list_detail_and_syllabus_pdf(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import pypdf
+
+        class FakePage:
+            def extract_text(self) -> str:
+                return (
+                    "七、上課費用：全程免費。\n"
+                    "八、報名方式：網路報名「https://forms.gle/abc123xyz」 填妥報名表後送出即為報名成功，額滿為止。\n"
+                    "十、繼續教育積分申請中：台灣兒科醫學會、台灣臨床心理學會、中華民國醫務社會工作協會。\n"
+                    "十二、會議流程 時間 主題\n"
+                    "08:40~09:00 學員報到\n"
+                    "09:00~10:30 課程一\n"
+                    "10:40~12:10 課程二"
+                )
+
+        class FakeReader:
+            def __init__(self, data: bytes) -> None:
+                self.pages = [FakePage()]
+
+        monkeypatch.setattr(pypdf, "PdfReader", FakeReader)
+
+        listing = (
+            "<html><body>"
+            '<ul class="list_td"><li>2026/11/29</li>'
+            '<li><a href="info.asp?/272.html"><b>以兒童為中心的早期療育  (協辦；積分：1.5)</b></a>'
+            "<small>地點：中國醫藥大學附設醫院 階梯教室</small></li></ul>"
+            "</body></html>"
+        )
+        detail = (
+            "<html><body>"
+            "<h1>活動標題：以兒童為中心的早期療育</h1>"
+            "<p>活動日期：2026/11/29</p>"
+            "<p>活動地點：中國醫藥大學附設醫院-癌症中心大樓 1 樓-階梯教室</p>"
+            "<p>主辦單位：中國醫藥大學兒童醫院兒童發展聯合評估中心</p>"
+            '<a href="../upload/activity/N20261015104425_001.pdf">1151129 簡章</a>'
+            "</body></html>"
+        )
+        fake_client = FakeHttpClient(
+            {
+                "https://www.tapedpmr.example.org/activity/index.asp": listing,
+                "https://www.tapedpmr.example.org/activity/info.asp?/272.html": detail,
+            },
+            byte_responses={"https://www.tapedpmr.example.org/upload/activity/N20261015104425_001.pdf": b"fakepdf"},
+        )
+
+        class TestTapedpmrScraper(GenericCatalogScraper):
+            source_id = "test_tapedpmr"
+            source_name = "測試兒童復健醫學會"
+            default_organizer = "測試兒童復健醫學會"
+            listing_urls = ("https://www.tapedpmr.example.org/activity/index.asp",)
+            max_pdf_attachments = 3
+            candidate_href_contains = ("activity/info.asp",)
+            credit_from_pdf = True
+            candidate_href_required = ("activity/info.asp",)
+
+        records = TestTapedpmrScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        rec = records[0]
+        assert rec.course_date == "115/11/29"
+        assert rec.fee == "免費"
+        assert rec.registration_url == "https://forms.gle/abc123xyz"
+        assert rec.course_time == "08:40–12:10"
+        assert rec.has_clinical_credit == "否"
+        assert "未列中華民國臨床心理師公會全國聯合會" in rec.credit_evidence
+
+    def test_tapedpmr_title_credit_fallback_without_syllabus(self) -> None:
+        listing = (
+            "<html><body>"
+            '<ul class="list_td"><li>2026/11/27</li>'
+            '<li><a href="info.asp?/275.html"><b>115年度訓練課程『OSAS手術與術後語言治療』 (積分：0.75)</b></a></li></ul>'
+            "</body></html>"
+        )
+        detail = (
+            "<html><body><h1>115年度訓練課程『OSAS手術與術後語言治療』</h1>"
+            "<p>活動日期：2026/11/27</p><p>活動地點：線上直播</p></body></html>"
+        )
+        fake_client = FakeHttpClient(
+            {
+                "https://www.tapedpmr.example.org/activity/index.asp": listing,
+                "https://www.tapedpmr.example.org/activity/info.asp?/275.html": detail,
+            }
+        )
+
+        class TestTapedpmrScraper(GenericCatalogScraper):
+            source_id = "test_tapedpmr"
+            source_name = "測試兒童復健醫學會"
+            default_organizer = "測試兒童復健醫學會"
+            listing_urls = ("https://www.tapedpmr.example.org/activity/index.asp",)
+            candidate_href_contains = ("activity/info.asp",)
+            candidate_href_required = ("activity/info.asp",)
+            credit_from_pdf = True
+
+        records = TestTapedpmrScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        assert records[0].has_clinical_credit == "否"
+        assert "醫事人員繼續教育積分" in records[0].credit_evidence
+
+    def test_asia_eft_wp_api_filters_past_and_parses_upcoming(self) -> None:
+        from scraper.sources.asia_eft import AsiaEftScraper
+
+        posts = [
+            {
+                "title": {"rendered": "2026上半年度｜EFT延續學習活動開跑"},
+                "content": {"rendered": "📅 時間：01/15、02/12、03/05；19:00-20:10<br>📌報名連結：https://forms.gle/old123"},
+                "date": "2026-01-10T00:00:00",
+            },
+            {
+                "title": {"rendered": "2026下半年度｜EFT延續學習活動開跑"},
+                "content": {
+                    "rendered": (
+                        "🌀週四晚上班 📅 時間：11/19、12/03、12/17；19:00-20:10"
+                        "<br>📌報名連結：https://forms.gle/secondhalf456"
+                    )
+                },
+                "date": "2026-11-01T00:00:00",
+            },
+            {
+                "title": {"rendered": "EFT情緒取向治療國際認證家庭治療課程介紹"},
+                "content": {"rendered": "EFFT 理論與技術課程（24 小時）介紹，無日期與報名連結。"},
+                "date": "2026-07-12T00:00:00",
+            },
+        ]
+        fake_client = FakeHttpClient(
+            {
+                "https://asia-eft.com/wp-json/wp/v2/posts?per_page=100": json.dumps(posts),
+            }
+        )
+
+        records = AsiaEftScraper().scrape(fake_client, created_at="2026-11-10")  # type: ignore[arg-type]
+        assert len(records) == 1
+        rec = records[0]
+        assert rec.course_name == "2026下半年度｜EFT延續學習活動開跑"
+        assert rec.course_date == "115/11/19–115/12/17"
+        assert rec.course_time == "19:00–20:10"
+        assert rec.registration_url == "https://forms.gle/secondhalf456"
+        assert rec.registration_period == "即日起至 115/11/19 前"
 
     def test_fetch_all_sources_isolates_errors_and_returns_whitelist_and_statuses(
         self, monkeypatch: pytest.MonkeyPatch
