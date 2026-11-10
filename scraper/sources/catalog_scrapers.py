@@ -15,6 +15,7 @@ from scraper.extractor import (
     extract_course_from_page,
     extract_fee,
     extract_registration_period,
+    extract_registration_url,
     is_registration_closed,
     normalize_roc_date,
 )
@@ -101,6 +102,12 @@ class GenericCatalogScraper(BaseSourceScraper):
     max_pdf_attachments: int = 0
     # Sites with multi-tier fee tables on the public course page.
     fee_table: bool = False
+    # Href substrings that mark an anchor as a course detail page regardless of title keywords.
+    candidate_href_contains: tuple[str, ...] = ()
+    # When set, only anchors matching one of these substrings are candidates.
+    candidate_href_required: tuple[str, ...] = ()
+    # Syllabus PDFs carry the official 繼續教育積分 society list.
+    credit_from_pdf: bool = False
 
     def get_listing_urls(self) -> tuple[str, ...]:
         if self.listing_urls:
@@ -139,13 +146,41 @@ class GenericCatalogScraper(BaseSourceScraper):
                 break
         return "\n".join(texts)[:6000]
 
+    def _credit_from_pdf(self, pdf_text: str, record) -> None:
+        """Set credit status from a syllabus PDF's 繼續教育積分 society list."""
+        match = re.search(r"繼續教育積分[^\n]{0,120}", pdf_text)
+        if not match:
+            return
+        line = re.sub(r"\s+", " ", match.group(0)).strip()
+        if "臨床心理師公會" in line:
+            record.has_clinical_credit = "是"
+            record.credit_evidence = line[:200]
+        else:
+            society_count = len(re.findall(r"學會|公會|協會", line))
+            if society_count >= 2:
+                record.has_clinical_credit = "否"
+                record.credit_evidence = (
+                    f"簡章載明「{line[:120]}」，未列中華民國臨床心理師公會全國聯合會，非臨床心理師積分課程"
+                )
+
 
     def _is_candidate_link(self, title: str, resolved_url: str, base_url: str) -> bool:
-        if not is_likely_course_title(title):
+        if not title or len(title) < 5:
             return False
 
         lower_url = resolved_url.lower()
         if any(tok in lower_url for tok in _SKIP_HREF_TOKENS):
+            return False
+
+        if self.candidate_href_required and not any(
+            tok in lower_url for tok in self.candidate_href_required
+        ):
+            return False
+
+        if self.candidate_href_contains and any(tok in lower_url for tok in self.candidate_href_contains):
+            return resolved_url.rstrip("/") != base_url.rstrip("/")
+
+        if not is_likely_course_title(title):
             return False
 
         has_course_kw = any(kw in title for kw in COURSE_INDICATOR_KEYWORDS)
@@ -234,6 +269,19 @@ class GenericCatalogScraper(BaseSourceScraper):
                             record.registration_period = pdf_period
                         if not record.course_time or record.course_time == "詳見簡章":
                             record.course_time = _schedule_span(pdf_text) or record.course_time
+                        if self.credit_from_pdf and record.has_clinical_credit == "未知":
+                            self._credit_from_pdf(pdf_text, record)
+                        pdf_url = extract_registration_url(pdf_text, detail_url)
+                        if pdf_url:
+                            record.registration_url = pdf_url
+                if self.credit_from_pdf and record.has_clinical_credit == "未知":
+                    credit_match = re.search(r"積分[：:]?\s*([\d.]+)", title)
+                    if credit_match:
+                        record.has_clinical_credit = "否"
+                        record.credit_evidence = (
+                            f"課程公告標題列「積分：{credit_match.group(1)}」（醫事人員繼續教育積分），"
+                            "簡章未提及臨床心理師（ATCP）積分"
+                        )
                 if self.fee_table:
                     table_fee = _fee_range_from_table(detail_html)
                     if table_fee:
@@ -290,13 +338,14 @@ _CATALOG_SPECS: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
     ("TposScraper", "tpos", "台灣心理腫瘤醫學學會", "台灣心理腫瘤醫學學會", ("http://www.tpos-society.org/",)),
     ("IaptcScraper", "iaptc", "台灣網路成癮防治學會", "台灣網路成癮防治學會", ("https://iaptc.asia.edu.tw/",)),
     ("TasctaiwanScraper", "tasctaiwan", "台灣性諮商學會", "台灣性諮商學會", ("https://tasctaiwan.tw/",)),
-    ("AcftEftScraper", "acft_eft", "華人伴侶與家族治療協會／亞太EFT", "華人伴侶與家族治療協會", ("http://www.acft.org.tw/", "https://asia-eft.com/")),
+    ("AcftEftScraper", "acft_eft", "華人伴侶與家族治療協會", "華人伴侶與家族治療協會", ("http://www.acft.org.tw/",)),
     ("EcataScraper", "ecata", "台灣表創性藝術治療學會", "台灣表創性藝術治療學會", ("https://ecata.org.tw/",)),
     ("MindfulnessScraper", "mindfulness", "台灣正念發展協會", "台灣正念發展協會", ("https://www.mindfulness.org.tw/",)),
     ("TsosScraper", "tsos", "台灣自殺防治學會", "台灣自殺防治學會", ("https://www.tsos.org.tw/",)),
     ("BeclassScraper", "beclass", "Beclass 活動平台", "Beclass 活動平台", ("https://www.beclass.com/default.php?name=ShowList&op=catRank&range=T",)),
     ("TaipeiHealthScraper", "taipei_health", "臺北市政府衛生局", "臺北市政府衛生局", ("https://health.gov.taipei/", "https://health.gov.taipei/News.aspx?n=4E598A19194EA548")),
     ("KaohsiungHealthScraper", "kaohsiung_health", "高雄市政府衛生局", "高雄市政府衛生局", ("https://health.kcg.gov.tw/", "https://health.kcg.gov.tw/News.aspx?n=51623F92649C1BE2")),
+    ("TapedpmrScraper", "tapedpmr", "台灣兒童復健醫學會", "台灣兒童復健醫學會", ("https://www.tapedpmr.org.tw/activity/index.asp", "https://www.tapedpmr.org.tw/activity/index.asp?/2.html")),
 )
 
 for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
@@ -310,7 +359,10 @@ for _cls_name, _sid, _sname, _org, _urls in _CATALOG_SPECS:
             "base_url": _urls[0],
             "listing_urls": _urls,
             "registration_url_is_detail": _sid == "beclass",
-            "max_pdf_attachments": 3 if _sid in ("taipei_health", "kaohsiung_health") else 0,
             "fee_table": _sid == "atpt",
+            "candidate_href_contains": ("activity/info.asp",) if _sid == "tapedpmr" else (),
+            "candidate_href_required": ("activity/info.asp",) if _sid == "tapedpmr" else (),
+            "credit_from_pdf": _sid == "tapedpmr",
+            "max_pdf_attachments": 3 if _sid in ("taipei_health", "kaohsiung_health", "tapedpmr") else 0,
         },
     )

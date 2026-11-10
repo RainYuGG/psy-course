@@ -1,4 +1,4 @@
-"""Registry and runner for all 20 Taiwanese clinical/counseling psychology course scrapers."""
+"""Registry and runner for all 22 Taiwanese clinical/counseling psychology course scrapers."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from datetime import date
 from scraper.http_client import HttpClient
 from scraper.models import CourseRecord
 from scraper.sources.accupass import AccupassScraper
+from scraper.sources.asia_eft import AsiaEftScraper
 from scraper.sources.atcp import AtcpScraper
 from scraper.sources.base import BaseSourceScraper
 from scraper.sources.catalog_scrapers import (
@@ -20,6 +21,7 @@ from scraper.sources.catalog_scrapers import (
     PsychoanalysisScraper,
     RmdarocScraper,
     SopScraper,
+    TapedpmrScraper,
     TapScraper,
     TasctaiwanScraper,
     TaipeiHealthScraper,
@@ -51,6 +53,8 @@ ALL_SCRAPERS: list[BaseSourceScraper] = [
     TaipeiHealthScraper(),
     KaohsiungHealthScraper(),
     AccupassScraper(),
+    TapedpmrScraper(),
+    AsiaEftScraper(),
 ]
 
 
@@ -80,6 +84,7 @@ __all__ = [
     "ALL_SCRAPERS",
     "AccupassScraper",
     "AcftEftScraper",
+    "AsiaEftScraper",
     "AtptScraper",
     "BeclassScraper",
     "BaseSourceScraper",
@@ -90,7 +95,7 @@ __all__ = [
     "PsychoanalysisScraper",
     "RmdarocScraper",
     "SopScraper",
-    "TaclipWhitelistScraper",
+    "TapedpmrScraper",
     "TapScraper",
     "TasctaiwanScraper",
     "TaipeiHealthScraper",
