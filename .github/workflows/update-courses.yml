@@ -9,8 +9,8 @@ on:
       - "docs/**"
       - ".github/workflows/update-courses.yml"
   schedule:
-    # Runs daily at 22:00 UTC (06:00 Taiwan time UTC+8)
-    - cron: "0 22 * * *"
+    # Runs weekly on Monday at 22:00 UTC (06:00 Taiwan time UTC+8)
+    - cron: "0 22 * * 1"
   workflow_dispatch:
 
 permissions:
